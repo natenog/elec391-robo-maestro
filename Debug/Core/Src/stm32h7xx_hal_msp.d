@@ -35,7 +35,9 @@ Core/Src/stm32h7xx_hal_msp.o: ../Core/Src/stm32h7xx_hal_msp.c \
  D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.h \
  D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/stm32h7xx_nucleo_conf.h \
  D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo_errno.h \
- D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/encoder.h
+ D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/encoder.h \
+ D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/tim.h \
+ D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/main.h
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/main.h:
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h:
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/stm32h7xx_hal_conf.h:
@@ -73,3 +75,5 @@ D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Drivers/BSP/STM32H7xx_Nucle
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/stm32h7xx_nucleo_conf.h:
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo_errno.h:
 D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/encoder.h:
+D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/tim.h:
+D:/STM32CubeIDE/workspace_2.0.0/elec391-robo-maestro/Core/Inc/main.h:

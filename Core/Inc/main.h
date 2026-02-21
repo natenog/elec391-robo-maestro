@@ -52,6 +52,13 @@ typedef enum {
 	MOTOR_BACKWARD,
 	MOTOR_STOP
 } MotorDirection;
+
+typedef enum {
+	MOTOR_STATE_FORWARD,
+	MOTOR_STATE_BACKWARD,
+	MOTOR_STATE_STOP
+} MotorState;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -79,14 +86,13 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 #define MOTOR_IN1_PORT GPIOB
-#define MOTOR_IN1_PIN GPIO_PIN_1
+#define MOTOR_IN1_PIN GPIO_PIN_4
 
 #define MOTOR_IN2_PORT GPIOB
-#define MOTOR_IN2_PIN GPIO_PIN_3
+#define MOTOR_IN2_PIN GPIO_PIN_5
 
 #define HTIM_MOTOR htim2
-#define HTIM_PID htim3
-#define HTIM_ENCODER htim4
+#define HTIM_PID htim4
 #define TIM_CHANNEL_MOTOR_A TIM_CHANNEL_1
 #define TIM_CHANNEL_MOTOR_B TIM_CHANNEL_2
 /* USER CODE END Private defines */
