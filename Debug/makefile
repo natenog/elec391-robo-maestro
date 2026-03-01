@@ -62,7 +62,7 @@ main-build: elec391-robo-maestro.elf secondary-outputs
 
 # Tool invocations
 elec391-robo-maestro.elf elec391-robo-maestro.map: $(OBJS) $(USER_OBJS) D:\STM32CubeIDE\workspace_2.0.0\elec391-robo-maestro\STM32H723ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "elec391-robo-maestro.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"D:\STM32CubeIDE\workspace_2.0.0\elec391-robo-maestro\STM32H723ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="elec391-robo-maestro.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "elec391-robo-maestro.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"D:\STM32CubeIDE\workspace_2.0.0\elec391-robo-maestro\STM32H723ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="elec391-robo-maestro.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

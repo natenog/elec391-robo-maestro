@@ -53,13 +53,24 @@ COM_InitTypeDef BspCOMInit;
 __IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
-double Kp;
-double Kd;
-double Ki;
+float Kp = 5.22505;
+float Kd = 0.101565;
+float Ki = 45.201;
 MotorStruct Motor = {0};
 volatile int32_t pos = 0;
 volatile int32_t delta = 0;
 volatile int32_t prevPos = 0;
+volatile int32_t error = 0;
+volatile int32_t prevError = 0;
+volatile float d = 0.0;
+volatile float i = 0.0;
+volatile float output;
+volatile float percent;
+int32_t target = 2000;
+bool enCtrl = false;
+
+volatile uint32_t lastTimestamp = 0;
+volatile uint32_t currentTimestamp = 0;
 
 /* USER CODE END PV */
 
@@ -74,6 +85,7 @@ void MotorForward(void);
 void MotorBackward(void);
 void MotorStop(void);
 void MotorSetSpeedPercent(float percent);
+void Move1WhiteKey(MotorDirection direction, float percent);
 //void MotorControl(MotorDirection direction);
 //void MotorSetSpeed(uint16_t speed);
 /* USER CODE END PFP */
@@ -119,11 +131,15 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_TIM23_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_A);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_B);
+  HAL_TIM_PWM_Start(&htim23, TIM_CHANNEL_1);
   HAL_TIM_Base_Start(&HTIM_MOTOR);
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
+  MotorSetSpeedPercent(0);
   //__HAL_TIM_MOE_ENABLE(&htim1);
   //__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 999);
 
@@ -163,17 +179,28 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t lastPrint = 0;
-  MotorState motorState = MOTOR_STATE_FORWARD;
-  uint32_t motorTimer = 0;
+  //MotorState motorState = MOTOR_STATE_FORWARD;
+  //uint32_t motorTimer = 0;
+  //Move1WhiteKey(MOTOR_FORWARD, 80);
+  Move1WhiteKey(MOTOR_BACKWARD, 80);
+  //Move1WhiteKey(MOTOR_BACKWARD, 80);
+  MotorForward();
+  printf("\033[2J\033[H");
   while (1)
   {
 	uint32_t now = HAL_GetTick();
 	if (now - lastPrint >= 100)   // every 100 ms
 		{
 			lastPrint = HAL_GetTick();
-			printf("Pos=%ld  d=%ld\r\n", pos, delta);
+			printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, d, i, output, error, prevError);
 		}
 
+
+	if (now >= 2000) {
+		target = 300;
+	}
+
+	/*
 	switch (motorState) {
 		case MOTOR_STATE_FORWARD:
 			MotorForward();
@@ -205,45 +232,9 @@ int main(void)
 			}
 			break;
 	}
-
-	/*
-	printf("Motor forwards\r\n");
-	//MotorControl(MOTOR_FORWARD);
-	MotorForward();
-	MotorSetSpeedPercent(50);
-	//printf("Pin B1 = %d, Pin B3 = %d\r\n", HAL_GPIO_ReadPin(MOTOR_IN1_PORT, MOTOR_IN1_PIN), HAL_GPIO_ReadPin(MOTOR_IN2_PORT, MOTOR_IN2_PIN));
-	HAL_Delay(1000);
-
-	printf("Motor backwards\r\n");
-	//MotorControl(MOTOR_BACKWARD);
-	MotorBackward();
-	MotorSetSpeedPercent(80);
-	//printf("Pin B1 = %d, Pin B3 = %d\r\n", HAL_GPIO_ReadPin(MOTOR_IN1_PORT, MOTOR_IN1_PIN), HAL_GPIO_ReadPin(MOTOR_IN2_PORT, MOTOR_IN2_PIN));
-	HAL_Delay(500);
-
-	printf("Motor stop\r\n");
-	//MotorControl(MOTOR_STOP);
-	MotorStop();
-	//printf("Pin B1 = %d, Pin B3 = %d\r\n", HAL_GPIO_ReadPin(MOTOR_IN1_PORT, MOTOR_IN1_PIN), HAL_GPIO_ReadPin(MOTOR_IN2_PORT, MOTOR_IN2_PIN));
-	HAL_Delay(2000);
 	*/
 
 
-	//int32_t pos = __HAL_TIM_GET_COUNTER(&htim3);
-	//int32_t delta = pos - last;
-	//last = pos;
-
-	//printf("Pos=%ld  d=%ld\r\n", pos, delta);
-	//HAL_Delay(100);
-
-
-	//uint8_t encoderA = HAL_GPIO_ReadPin(ENC_A_PORT, ENC_A_PIN);
-	//uint8_t encoderB = HAL_GPIO_ReadPin(ENC_B_PORT, ENC_B_PIN);
-
-	//printf("Encoder readings: %lu\r\n", ReadEncoder());
-
-	//printf("A=%d B=%d\r\n", encoderA, encoderB);
-	//HAL_Delay(50); // slow down print rate
 
     /* USER CODE END WHILE */
 
@@ -315,11 +306,91 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	float dt = 0.001;
+	float i_Max = 100 / Ki;
 	if (htim == &HTIM_PID) {
-
 		pos = __HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
 		prevPos = pos;
+
+		if (enCtrl) {
+			error = target - pos;
+			d = (error - prevError) * dt;
+			i += error * dt;
+			output = Kp * error + Kd * d + Ki * i;
+			//percent = fabs(output / 63999);
+
+
+			if (i > i_Max) {
+				i = i_Max;
+			}
+			else if (i < -i_Max) {
+				i = -i_Max;
+			}
+
+			if (output > 100) {
+				output = 100;
+			}
+			else if (output < -100) {
+				output = -100;
+			}
+
+			if (output > 0) {
+				MotorForward();
+			}
+			else if (output < 0) {
+				MotorBackward();
+				output *= -1;
+			}
+			else {
+				MotorStop();
+			}
+
+			prevError = error;
+
+			//currentTimestamp = HAL_GetTick();
+
+			//printf("Timestamp: %lu\r\n", currentTimestamp - lastTimestamp);
+
+			//lastTimestamp = currentTimestamp;
+
+			MotorSetSpeedPercent(output);
+		}
+
+	}
+}
+
+
+
+void Move1WhiteKey(MotorDirection direction, float percent) {
+	// TODO: Fix overshoot of roughly 100 encoder counts (probably fixed with PID?)
+	int32_t source = pos;
+	printf("Source = %lu, pos = %lu\r\n", source, pos);
+	if (direction == MOTOR_FORWARD) {
+		MotorForward();
+		MotorSetSpeedPercent(percent);
+		while (llabs(source-pos) < 811) {
+			printf("Source = %ld, pos = %ld\r\n", source, pos);
+			continue;
+		}
+		MotorBackward();
+		MotorSetSpeedPercent(80);
+		HAL_Delay(50);
+		MotorStop();
+	}
+	else if (direction == MOTOR_BACKWARD) {
+		MotorSetSpeedPercent(0);
+		MotorBackward();
+		HAL_Delay(1);
+		MotorSetSpeedPercent(percent);
+		while (llabs(source-pos) < 811) {
+			printf("Source = %ld, pos = %ld\r\n", source, pos);
+			continue;
+		}
+		MotorForward();
+		MotorSetSpeedPercent(80);
+		HAL_Delay(50);
+		MotorStop();
 	}
 }
 
@@ -338,11 +409,13 @@ void MotorStop(void) {
 	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_RESET);
 }
 
+
 void MotorSetSpeedPercent(float percent) {
     if(percent > 100) percent = 100;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
 }
+
 
 /*
 void MotorControl(MotorDirection direction) {
