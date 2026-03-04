@@ -86,10 +86,10 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 #define MOTOR_IN1_PORT GPIOB
-#define MOTOR_IN1_PIN GPIO_PIN_4
+#define MOTOR_IN1_PIN GPIO_PIN_3
 
 #define MOTOR_IN2_PORT GPIOB
-#define MOTOR_IN2_PIN GPIO_PIN_5
+#define MOTOR_IN2_PIN GPIO_PIN_4
 
 #define HTIM_MOTOR htim2
 #define HTIM_PID htim4

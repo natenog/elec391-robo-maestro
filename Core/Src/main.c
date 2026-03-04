@@ -53,21 +53,24 @@ COM_InitTypeDef BspCOMInit;
 __IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
-float Kp = 5.22505;
-float Kd = 0.101565;
-float Ki = 45.201;
+float Kp = 13.3;
+float Ki = 3.015;
+float Kd = 1.2;
+uint8_t N = 25;
 MotorStruct Motor = {0};
 volatile int32_t pos = 0;
 volatile int32_t delta = 0;
 volatile int32_t prevPos = 0;
 volatile int32_t error = 0;
 volatile int32_t prevError = 0;
-volatile float d = 0.0;
-volatile float i = 0.0;
+volatile float prop = 0.0;
+volatile float integral = 0.0;
+volatile float deriv = 0.0;
+volatile float prevDeriv = 0.0;
 volatile float output;
 volatile float percent;
 int32_t target = 2000;
-bool enCtrl = false;
+bool enCtrl = true;
 
 volatile uint32_t lastTimestamp = 0;
 volatile uint32_t currentTimestamp = 0;
@@ -182,23 +185,34 @@ int main(void)
   //MotorState motorState = MOTOR_STATE_FORWARD;
   //uint32_t motorTimer = 0;
   //Move1WhiteKey(MOTOR_FORWARD, 80);
-  Move1WhiteKey(MOTOR_BACKWARD, 80);
+  //Move1WhiteKey(MOTOR_BACKWARD, 80);
   //Move1WhiteKey(MOTOR_BACKWARD, 80);
   MotorForward();
   printf("\033[2J\033[H");
   while (1)
   {
 	uint32_t now = HAL_GetTick();
-	if (now - lastPrint >= 100)   // every 100 ms
+	if (now - lastPrint >= 25)   // every 25 ms
 		{
 			lastPrint = HAL_GetTick();
-			printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, d, i, output, error, prevError);
+			//printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
+			if (now < 5000) {
+				printf("%ld,%ld\r\n", now, pos);
+			}
 		}
-
 
 	if (now >= 2000) {
 		target = 300;
 	}
+
+	if (now >= 3000) {
+		target = 1000;
+	}
+
+	if (now >= 4000) {
+		target = 3000;
+	}
+
 
 	/*
 	switch (motorState) {
@@ -306,53 +320,68 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	float dt = 0.001;
-	float i_Max = 100 / Ki;
+	float dt = 0.001f;
+	float i_Max = 100.0f / Ki;
 	if (htim == &HTIM_PID) {
 		pos = __HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
 		prevPos = pos;
 
 		if (enCtrl) {
+			// PID controller method: Backwards Euler
+			// sampling frequency f = 1kHz --> sampling period dt = 0.001 s
+			// Integral term = i = dt * (z / (z - 1)) --> step response u[n] at each dt
+			// Derivative term = d = N / (1 + N*dt*(z / (z-1)))
+
+			// TODO: Add rate limiter for target position --> increment target based on slew rate
+
 			error = target - pos;
-			d = (error - prevError) * dt;
-			i += error * dt;
-			output = Kp * error + Kd * d + Ki * i;
-			//percent = fabs(output / 63999);
+			prop = Kp * error;
+			integral += Ki * error * dt;
+			deriv = (prevDeriv + Kd * N * (error - prevError)) / (1.0f + N * dt);
+			output = prop + integral + deriv;
 
-
-			if (i > i_Max) {
-				i = i_Max;
+			// Integral anti-windup
+			if (integral > i_Max) {
+				integral = i_Max;
 			}
-			else if (i < -i_Max) {
-				i = -i_Max;
-			}
-
-			if (output > 100) {
-				output = 100;
-			}
-			else if (output < -100) {
-				output = -100;
+			else if (integral < -i_Max) {
+				integral = -i_Max;
 			}
 
-			if (output > 0) {
+			// Clamp output
+			if (output > 100.0f) {
+				output = 100.0f;
+			}
+			else if (output < -100.0f) {
+				output = -100.0f;
+			}
+
+			// Switch direction depending on output sign
+			if (output > 0.0f) {
 				MotorForward();
 			}
-			else if (output < 0) {
+			else if (output < 0.0f) {
 				MotorBackward();
-				output *= -1;
+				output *= -1.0f;
 			}
 			else {
 				MotorStop();
 			}
 
 			prevError = error;
+			prevDeriv = deriv;
 
-			//currentTimestamp = HAL_GetTick();
-
-			//printf("Timestamp: %lu\r\n", currentTimestamp - lastTimestamp);
-
-			//lastTimestamp = currentTimestamp;
+			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
+			if (abs(target-pos) < 5) {
+				prevError = 0.0f;
+				integral = 0.0f;
+				deriv = 0.0f;
+				prevDeriv = 0.0f;
+				MotorSetSpeedPercent(0);
+			} else {
+			MotorSetSpeedPercent(output);
+			}
 
 			MotorSetSpeedPercent(output);
 		}
