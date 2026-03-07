@@ -53,23 +53,32 @@ COM_InitTypeDef BspCOMInit;
 __IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
-float Kp = 13.3;
-float Ki = 3.015;
-float Kd = 1.2;
+float Kp = 13.3f;
+float Ki = 3.015f;
+float Kd = 1.2f;
 uint8_t N = 25;
+float dt = 0.001f;
+
+float vel = 0.0f;
+float maxVel = 4000.0f;
+float maxAccel = 8000.0f;
+
 MotorStruct Motor = {0};
 volatile int32_t pos = 0;
 volatile int32_t delta = 0;
 volatile int32_t prevPos = 0;
 volatile int32_t error = 0;
 volatile int32_t prevError = 0;
-volatile float prop = 0.0;
-volatile float integral = 0.0;
-volatile float deriv = 0.0;
-volatile float prevDeriv = 0.0;
+volatile float prop = 0.0f;
+volatile float integral = 0.0f;
+volatile float deriv = 0.0f;
+volatile float prevDeriv = 0.0f;
 volatile float output;
 volatile float percent;
 int32_t target = 2000;
+int32_t subTarget = 0;
+float subTarget_f = 0.0f;
+//float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
 
 volatile uint32_t lastTimestamp = 0;
@@ -82,13 +91,12 @@ void SystemClock_Config(void);
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
 bool Home(void);
-void Step(void);
+void RateLimiter(int32_t target);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorForward(void);
 void MotorBackward(void);
 void MotorStop(void);
 void MotorSetSpeedPercent(float percent);
-void Move1WhiteKey(MotorDirection direction, float percent);
 //void MotorControl(MotorDirection direction);
 //void MotorSetSpeed(uint16_t speed);
 /* USER CODE END PFP */
@@ -192,12 +200,12 @@ int main(void)
   while (1)
   {
 	uint32_t now = HAL_GetTick();
-	if (now - lastPrint >= 25)   // every 25 ms
+	if (now - lastPrint >= 100)   // every 100 ms
 		{
 			lastPrint = HAL_GetTick();
 			//printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
-			if (now < 5000) {
-				printf("%ld,%ld\r\n", now, pos);
+			if (now < 8000) {
+				printf("%ld,%ld,%ld,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop, integral, deriv, output);
 			}
 		}
 
@@ -205,13 +213,14 @@ int main(void)
 		target = 300;
 	}
 
-	if (now >= 3000) {
+	if (now >= 4000) {
 		target = 1000;
 	}
 
-	if (now >= 4000) {
+	if (now >= 6000) {
 		target = 3000;
 	}
+
 
 
 	/*
@@ -319,9 +328,80 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+void RateLimiter(int32_t finalTarget) {
+	// TODO: Add rate limiter for target position --> increment target based on slew rate
+
+	// percentage of the input that is added to the target at each time period
+	float remaining = (float)finalTarget - subTarget_f;
+	int32_t position_tolerance = 5;
+	int8_t direction = 0;
+
+	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt)) {
+		subTarget_f = (float)finalTarget;
+		subTarget = finalTarget;
+		vel = 0.0f;
+		return;
+	}
+
+	if (remaining > 0.0f) {
+		direction = 1;
+	}
+	else if (remaining < 0.0f) {
+		direction = -1;
+	}
+	else {
+		direction = 0;
+	}
+
+	float vel_abs = fabsf(vel);
+	float brakingDistance = (vel_abs * vel_abs) / (2.0f * maxAccel);
+
+	if (vel > 0.0f && direction < 0) {
+		vel -= maxAccel * dt;
+		if (vel < 0.0f) vel = 0.0f;
+	}
+	else if (vel < 0.0f && direction > 0) {
+		vel += maxAccel * dt;
+		if (vel > 0.0f) vel = 0.0f;
+	}
+	else {
+		if (fabsf(remaining) <= brakingDistance) {
+			if (vel_abs > 0.0f) {
+				if (vel > 0.0f) {
+					vel -= maxAccel * dt;
+					if (vel < 0.0f) vel = 0.0f;
+				}
+				else if (vel < 0.0f) {
+					vel += maxAccel * dt;
+					if (vel > 0.0f) vel = 0.0f;
+				}
+			}
+		}
+		else {
+			if (fabsf(remaining) > position_tolerance) {
+				vel += maxAccel * dt * (float)direction;
+				if (vel > maxVel) vel = maxVel;
+				if (vel < -maxVel) vel = -maxVel;
+			}
+		}
+	}
+
+	subTarget_f += vel * dt;
+
+	if (direction > 0 && subTarget_f > (float)finalTarget) {
+		subTarget_f = (float)finalTarget;
+		vel = 0.0f;
+	}
+	else if (direction < 0 && subTarget_f < (float)finalTarget) {
+		subTarget_f = (float)finalTarget;
+		vel = 0.0f;
+	}
+
+	subTarget = (int32_t)subTarget_f;
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	float dt = 0.001f;
-	float i_Max = 100.0f / Ki;
+	float INT_MAX = 100.0f / Ki;
 	if (htim == &HTIM_PID) {
 		pos = __HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
@@ -333,21 +413,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// Integral term = i = dt * (z / (z - 1)) --> step response u[n] at each dt
 			// Derivative term = d = N / (1 + N*dt*(z / (z-1)))
 
-			// TODO: Add rate limiter for target position --> increment target based on slew rate
+			// input the rate limiter output into the PID controller
+			RateLimiter(target);
 
-			error = target - pos;
+			error = subTarget - pos;
 			prop = Kp * error;
 			integral += Ki * error * dt;
 			deriv = (prevDeriv + Kd * N * (error - prevError)) / (1.0f + N * dt);
-			output = prop + integral + deriv;
 
 			// Integral anti-windup
-			if (integral > i_Max) {
-				integral = i_Max;
+			if (integral > INT_MAX) {
+				integral = INT_MAX;
 			}
-			else if (integral < -i_Max) {
-				integral = -i_Max;
+			else if (integral < -INT_MAX) {
+				integral = -INT_MAX;
 			}
+
+			output = prop + integral + deriv;
 
 			// Clamp output
 			if (output > 100.0f) {
@@ -373,53 +455,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			prevDeriv = deriv;
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
-			if (abs(target-pos) < 5) {
+			if (abs(target - pos) < 30) {
 				prevError = 0.0f;
 				integral = 0.0f;
 				deriv = 0.0f;
 				prevDeriv = 0.0f;
 				MotorSetSpeedPercent(0);
 			} else {
-			MotorSetSpeedPercent(output);
+				MotorSetSpeedPercent(output);
 			}
-
-			MotorSetSpeedPercent(output);
 		}
 
-	}
-}
-
-
-
-void Move1WhiteKey(MotorDirection direction, float percent) {
-	// TODO: Fix overshoot of roughly 100 encoder counts (probably fixed with PID?)
-	int32_t source = pos;
-	printf("Source = %lu, pos = %lu\r\n", source, pos);
-	if (direction == MOTOR_FORWARD) {
-		MotorForward();
-		MotorSetSpeedPercent(percent);
-		while (llabs(source-pos) < 811) {
-			printf("Source = %ld, pos = %ld\r\n", source, pos);
-			continue;
-		}
-		MotorBackward();
-		MotorSetSpeedPercent(80);
-		HAL_Delay(50);
-		MotorStop();
-	}
-	else if (direction == MOTOR_BACKWARD) {
-		MotorSetSpeedPercent(0);
-		MotorBackward();
-		HAL_Delay(1);
-		MotorSetSpeedPercent(percent);
-		while (llabs(source-pos) < 811) {
-			printf("Source = %ld, pos = %ld\r\n", source, pos);
-			continue;
-		}
-		MotorForward();
-		MotorSetSpeedPercent(80);
-		HAL_Delay(50);
-		MotorStop();
 	}
 }
 
