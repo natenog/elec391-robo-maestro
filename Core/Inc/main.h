@@ -91,6 +91,9 @@ void Error_Handler(void);
 #define MOTOR_IN2_PORT GPIOB
 #define MOTOR_IN2_PIN GPIO_PIN_4
 
+#define HOME_PORT GPIOA
+#define HOME_PIN GPIO_PIN_1
+
 #define HTIM_MOTOR htim2
 #define HTIM_PID htim4
 #define TIM_CHANNEL_MOTOR_A TIM_CHANNEL_1

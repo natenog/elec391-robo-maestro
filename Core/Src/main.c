@@ -329,6 +329,27 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+bool Home(void) {
+	enCtrl = false; // disable PID control loop
+	MotorSetSpeedPercent(0);
+	HAL_Delay(1000);
+
+	while (1) {
+		MotorBackward();
+		MotorSetSpeedPercent(50);
+
+		if (HAL_GPIO_ReadPin(HOME_PORT, HOME_PIN)) {
+			pos = 0; // reset encoder value to 0
+			break;
+		}
+	}
+
+	enCtrl = true;
+	HAL_Delay(1000);
+
+	return true;
+}
+
 void RateLimiter(int32_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
