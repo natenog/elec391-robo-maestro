@@ -99,7 +99,6 @@ void MotorBackward(void);
 void MotorStop(void);
 void MotorSetSpeedPercent(float percent);
 //void MotorControl(MotorDirection direction);
-//void MotorSetSpeed(uint16_t speed);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -191,11 +190,6 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t lastPrint = 0;
-  //MotorState motorState = MOTOR_STATE_FORWARD;
-  //uint32_t motorTimer = 0;
-  //Move1WhiteKey(MOTOR_FORWARD, 80);
-  //Move1WhiteKey(MOTOR_BACKWARD, 80);
-  //Move1WhiteKey(MOTOR_BACKWARD, 80);
   MotorForward();
   printf("\033[2J\033[H");
   while (1)
@@ -221,44 +215,6 @@ int main(void)
 	if (now >= 6000) {
 		target = 3000;
 	}
-
-
-
-	/*
-	switch (motorState) {
-		case MOTOR_STATE_FORWARD:
-			MotorForward();
-			MotorSetSpeedPercent(50);
-
-			if (now - motorTimer >= 1000) {
-				motorState = MOTOR_STATE_BACKWARD;
-				motorTimer = now;
-				printf("---Motor backwards---\r\n");
-			}
-			break;
-		case MOTOR_STATE_BACKWARD:
-			MotorBackward();
-			MotorSetSpeedPercent(80);
-
-			if (now - motorTimer >= 500) {
-				motorState = MOTOR_STATE_STOP;
-				motorTimer = now;
-				printf("---Motor stop---\r\n");
-			}
-			break;
-		case MOTOR_STATE_STOP:
-			MotorStop();
-
-			if (now - motorTimer >= 2000) {
-				motorState = MOTOR_STATE_FORWARD;
-				motorTimer = now;
-				printf("---Motor forwards---\r\n");
-			}
-			break;
-	}
-	*/
-
-
 
     /* USER CODE END WHILE */
 
@@ -514,13 +470,11 @@ void MotorStop(void) {
 	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_RESET);
 }
 
-
 void MotorSetSpeedPercent(float percent) {
     if(percent > 100) percent = 100;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
 }
-
 
 /*
 void MotorControl(MotorDirection direction) {
@@ -540,21 +494,6 @@ void MotorControl(MotorDirection direction) {
 	default:
 		printf("ERROR: Invalid motor control setting. Please specify either MOTOR_FORWARD, MOTOR_BACKWARD, or MOTOR_STOP");
 		exit(EXIT_FAILURE);
-	}
-}
-*/
-
-/*
-void MotorSlowDown(uint16_t speed) {
-	// call condition: position is 1 key away
-	// slowDown
-	// S-curve function: speed = maxSpeed * (3*___^2 -2*___^3)
-
-	uint16_t currentSpeed = speed;
-
-	while (currentSpeed > 0) {
-		currentSpeed /= 2;
-		__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, currentSpeed);
 	}
 }
 */
