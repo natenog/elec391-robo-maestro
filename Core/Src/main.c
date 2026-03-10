@@ -55,13 +55,14 @@ __IO uint32_t BspButtonState = BUTTON_RELEASED;
 /* USER CODE BEGIN PV */
 float Kp = 13.3f;
 float Ki = 3.015f;
-float Kd = 1.2f;
+//float Kd = 1.2f;
+float Kd = 1.5f;
 uint8_t N = 25;
 float dt = 0.001f;
 
 float vel = 0.0f;
-float maxVel = 4000.0f;
-float maxAccel = 8000.0f;
+float maxVel = 25000.0f;
+float maxAccel = 30000.0f;
 
 MotorStruct Motor = {0};
 volatile int32_t pos = 0;
@@ -204,7 +205,7 @@ int main(void)
 		{
 			lastPrint = HAL_GetTick();
 			//printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
-			if (now < 8000) {
+			if (now < 10000) {
 				printf("%ld,%ld,%ld,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop, integral, deriv, output);
 			}
 		}
@@ -418,7 +419,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			error = subTarget - pos;
 			prop = Kp * error;
-			integral += Ki * error * dt;
+
+			if (abs(target - pos) >= 30) {
+				integral += Ki * error * dt;
+			}
+
 			deriv = (prevDeriv + Kd * N * (error - prevError)) / (1.0f + N * dt);
 
 			// Integral anti-windup
@@ -457,10 +462,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 			if (abs(target - pos) < 30) {
 				prevError = 0.0f;
-				integral = 0.0f;
-				deriv = 0.0f;
+				//integral = 0.0f;
+				//deriv = 0.0f;
 				prevDeriv = 0.0f;
 				MotorSetSpeedPercent(0);
+				//if (abs(target-pos) < 10) {
+				prop = 0.0f;
+				output = 0.0f;
+				//}
 			} else {
 				MotorSetSpeedPercent(output);
 			}
