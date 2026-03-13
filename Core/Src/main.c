@@ -262,6 +262,7 @@ int main(void)
 		target = 3000;
 	}
 
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -444,7 +445,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			error_displacement = subTarget - pos;
 			prop_displacement = Kp_displacement * error_displacement;
-			angularDisplacement = 2797 / (2 * M_PI);
+			angularDisplacement = (2 * M_PI) / 2797;
 			angularVelocity = angularDisplacement * dt;
 
 			/*

@@ -1392,7 +1392,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
  8000e5a:	ee67 7a27 	vmul.f32	s15, s14, s15
  8000e5e:	4b80      	ldr	r3, [pc, #512]	@ (8001060 <HAL_TIM_PeriodElapsedCallback+0x278>)
  8000e60:	edc3 7a00 	vstr	s15, [r3]
-			angularDisplacement = 2797 / (2 * M_PI);
+			angularDisplacement = (2 * M_PI) / 2797;
  8000e64:	4b7f      	ldr	r3, [pc, #508]	@ (8001064 <HAL_TIM_PeriodElapsedCallback+0x27c>)
  8000e66:	4a80      	ldr	r2, [pc, #512]	@ (8001068 <HAL_TIM_PeriodElapsedCallback+0x280>)
  8000e68:	601a      	str	r2, [r3, #0]
@@ -1627,7 +1627,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
  800105c:	24000000 	.word	0x24000000
  8001060:	24000268 	.word	0x24000268
  8001064:	24000288 	.word	0x24000288
- 8001068:	43de9404 	.word	0x43de9404
+ 8001068:	3b13385d 	.word	0x3b13385d
  800106c:	24000014 	.word	0x24000014
  8001070:	2400028c 	.word	0x2400028c
  8001074:	24000010 	.word	0x24000010
@@ -2707,9 +2707,9 @@ void MX_TIM2_Init(void)
  80015ae:	4b1f      	ldr	r3, [pc, #124]	@ (800162c <MX_TIM2_Init+0xb0>)
  80015b0:	2200      	movs	r2, #0
  80015b2:	609a      	str	r2, [r3, #8]
-  htim2.Init.Period = 63999;
+  htim2.Init.Period = 31999;
  80015b4:	4b1d      	ldr	r3, [pc, #116]	@ (800162c <MX_TIM2_Init+0xb0>)
- 80015b6:	f64f 12ff 	movw	r2, #63999	@ 0xf9ff
+ 80015b6:	f647 42ff 	movw	r2, #31999	@ 0x7cff
  80015ba:	60da      	str	r2, [r3, #12]
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
  80015bc:	4b1b      	ldr	r3, [pc, #108]	@ (800162c <MX_TIM2_Init+0xb0>)
