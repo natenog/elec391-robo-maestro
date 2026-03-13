@@ -53,10 +53,12 @@ COM_InitTypeDef BspCOMInit;
 __IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
-float Kp = 13.3f;
-float Ki = 3.015f;
+float Kp_displacement = 13.3f;
+float Ki_displacement = 3.015f;
 //float Kd = 1.2f;
-float Kd = 1.5f;
+float Kd_displacement = 1.5f;
+float Kp_velocity = 0.6f;
+float Ki_velocity = 5.0f;
 uint8_t N = 25;
 float dt = 0.001f;
 
@@ -68,22 +70,65 @@ MotorStruct Motor = {0};
 volatile int32_t pos = 0;
 volatile int32_t delta = 0;
 volatile int32_t prevPos = 0;
-volatile int32_t error = 0;
-volatile int32_t prevError = 0;
-volatile float prop = 0.0f;
-volatile float integral = 0.0f;
-volatile float deriv = 0.0f;
-volatile float prevDeriv = 0.0f;
-volatile float output;
-volatile float percent;
+volatile int32_t error_displacement = 0;
+volatile int32_t prevError_displacement = 0;
+volatile float error_velocity = 0.0f;
+volatile float prevError_velocity = 0.0f;
+volatile float prop_displacement = 0.0f;
+volatile float integral_displacement = 0.0f;
+volatile float deriv_displacement = 0.0f;
+volatile float prop_velocity = 0.0f;
+volatile float integral_velocity = 0.0f;
+volatile float prevDeriv_displacement = 0.0f;
+volatile float PD_output = 0.0f;
+volatile float output = 0.0f;
+volatile float percent = 0.0f;
+volatile float angularDisplacement = 0.0f;
+volatile float angularVelocity = 0.0f;
 int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
+bool solenoidOn = false;
 
 volatile uint32_t lastTimestamp = 0;
 volatile uint32_t currentTimestamp = 0;
+
+const Note notes[] = {
+	{"C2", },
+	{"D2", },
+	{"E2", },
+	{"F2", },
+	{"G2", },
+	{"A2", },
+	{"B2", },
+	{"C3", },
+	{"D3", },
+	{"E3", },
+	{"F3", },
+	{"G3", },
+	{"A3", },
+	{"B3", },
+	{"C4", },
+	{"D4", },
+	{"E4", },
+	{"F4", },
+	{"G4", },
+	{"A4", },
+	{"B4", },
+	{"C5", },
+	{"D5", },
+	{"E5", },
+	{"F5", },
+	{"G5", },
+	{"A5", },
+	{"B5", },
+	{"C6", },
+	{"D6", },
+	{"E6", },
+	{"F6", }
+};
 
 /* USER CODE END PV */
 
@@ -98,6 +143,7 @@ void MotorForward(void);
 void MotorBackward(void);
 void MotorStop(void);
 void MotorSetSpeedPercent(float percent);
+void SolenoidPress(int pressTime_ms);
 //void MotorControl(MotorDirection direction);
 /* USER CODE END PFP */
 
@@ -200,7 +246,7 @@ int main(void)
 			lastPrint = HAL_GetTick();
 			//printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
 			if (now < 10000) {
-				printf("%ld,%ld,%ld,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop, integral, deriv, output);
+				printf("%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 			}
 		}
 
@@ -295,6 +341,9 @@ bool Home(void) {
 		MotorSetSpeedPercent(50);
 
 		if (HAL_GPIO_ReadPin(HOME_PORT, HOME_PIN)) {
+			MotorStop();
+			MotorSetSpeedPercent(0);
+			HAL_Delay(500);
 			pos = 0; // reset encoder value to 0
 			break;
 		}
@@ -309,7 +358,6 @@ bool Home(void) {
 void RateLimiter(int32_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
-	// percentage of the input that is added to the target at each time period
 	float remaining = (float)finalTarget - subTarget_f;
 	int32_t position_tolerance = 5;
 	int8_t direction = 0;
@@ -379,7 +427,7 @@ void RateLimiter(int32_t finalTarget) {
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	float INT_MAX = 100.0f / Ki;
+	//float INT_MAX = 100.0f / Ki;
 	if (htim == &HTIM_PID) {
 		pos = __HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
@@ -394,24 +442,36 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// input the rate limiter output into the PID controller
 			RateLimiter(target);
 
-			error = subTarget - pos;
-			prop = Kp * error;
+			error_displacement = subTarget - pos;
+			prop_displacement = Kp_displacement * error_displacement;
+			angularDisplacement = 2797 / (2 * M_PI);
+			angularVelocity = angularDisplacement * dt;
 
+			/*
 			if (abs(target - pos) >= 30) {
 				integral += Ki * error * dt;
 			}
+			*/
 
-			deriv = (prevDeriv + Kd * N * (error - prevError)) / (1.0f + N * dt);
+			deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt);
 
 			// Integral anti-windup
+			/*
 			if (integral > INT_MAX) {
 				integral = INT_MAX;
 			}
 			else if (integral < -INT_MAX) {
 				integral = -INT_MAX;
 			}
+			*/
 
-			output = prop + integral + deriv;
+			PD_output = prop_displacement + deriv_displacement;
+			error_velocity = PD_output - angularVelocity;
+
+			prop_velocity = Kp_velocity * error_velocity;
+			integral_velocity += Ki_velocity * error_velocity * dt;
+
+			output = prop_velocity + integral_velocity;
 
 			// Clamp output
 			if (output > 100.0f) {
@@ -433,18 +493,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				MotorStop();
 			}
 
-			prevError = error;
-			prevDeriv = deriv;
+			prevError_displacement = error_displacement;
+			prevDeriv_displacement = deriv_displacement;
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 			if (abs(target - pos) < 30) {
-				prevError = 0.0f;
+				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
-				prevDeriv = 0.0f;
+				prevDeriv_displacement = 0.0f;
 				MotorSetSpeedPercent(0);
 				//if (abs(target-pos) < 10) {
-				prop = 0.0f;
+				prop_displacement = 0.0f;
 				output = 0.0f;
 				//}
 			} else {
@@ -474,6 +534,17 @@ void MotorSetSpeedPercent(float percent) {
     if(percent > 100) percent = 100;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
+}
+
+void SolenoidPress(int pressTime_ms) {
+	uint32_t startTime = HAL_GetTick();
+	solenoidOn = true;
+
+	HAL_GPIO_WritePin(SOLENOID_1_PORT, SOLENOID_1_PIN, GPIO_PIN_SET);
+
+	if (HAL_GetTick() - startTime > pressTime_ms) {
+		HAL_GPIO_WritePin(SOLENOID_1_PORT, SOLENOID_1_PIN, GPIO_PIN_RESET);
+	}
 }
 
 /*

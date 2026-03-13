@@ -59,6 +59,13 @@ typedef enum {
 	MOTOR_STATE_STOP
 } MotorState;
 
+typedef struct {
+	char name[3];
+	int position;
+} Note;
+
+extern const Note notes[];
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -93,6 +100,9 @@ void Error_Handler(void);
 
 #define HOME_PORT GPIOA
 #define HOME_PIN GPIO_PIN_1
+
+#define SOLENOID_1_PORT GPIOB
+#define SOLENOID_1_PIN GPIO_PIN_5
 
 #define HTIM_MOTOR htim2
 #define HTIM_PID htim4
