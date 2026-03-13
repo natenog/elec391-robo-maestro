@@ -2703,9 +2703,9 @@ void MX_TIM2_Init(void)
  800159e:	4b1f      	ldr	r3, [pc, #124]	@ (800161c <MX_TIM2_Init+0xb0>)
  80015a0:	2200      	movs	r2, #0
  80015a2:	609a      	str	r2, [r3, #8]
-  htim2.Init.Period = 63999;
+  htim2.Init.Period = 31999;
  80015a4:	4b1d      	ldr	r3, [pc, #116]	@ (800161c <MX_TIM2_Init+0xb0>)
- 80015a6:	f64f 12ff 	movw	r2, #63999	@ 0xf9ff
+ 80015a6:	f647 42ff 	movw	r2, #31999	@ 0x7cff
  80015aa:	60da      	str	r2, [r3, #12]
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
  80015ac:	4b1b      	ldr	r3, [pc, #108]	@ (800161c <MX_TIM2_Init+0xb0>)
