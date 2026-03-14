@@ -445,8 +445,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			error_displacement = subTarget - pos;
 			prop_displacement = Kp_displacement * error_displacement;
-			angularDisplacement = (2 * M_PI) / 2797;
-			angularVelocity = angularDisplacement * dt;
+			angularVelocity = (float)delta/dt;
 
 			/*
 			if (abs(target - pos) >= 30) {
@@ -498,7 +497,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			prevDeriv_displacement = deriv_displacement;
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
-			if (abs(target - pos) < 30) {
+			if (abs(subTarget - pos) < 30) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
@@ -506,6 +505,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				MotorSetSpeedPercent(0);
 				//if (abs(target-pos) < 10) {
 				prop_displacement = 0.0f;
+				integral_velocity = 0.0f;
 				output = 0.0f;
 				//}
 			} else {
