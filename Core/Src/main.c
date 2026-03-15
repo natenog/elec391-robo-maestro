@@ -54,24 +54,26 @@ __IO uint32_t BspButtonState = BUTTON_RELEASED;
 
 /* USER CODE BEGIN PV */
 float Kp_displacement = 13.3f;
-float Ki_displacement = 3.015f;
+float Ki_displacement = 1.2f;
 //float Kd = 1.2f;
 float Kd_displacement = 1.5f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
 uint8_t N = 25;
 float dt = 0.001f;
+float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
 float maxVel = 25000.0f;
 float maxAccel = 30000.0f;
 
+
 MotorStruct Motor = {0};
 volatile int32_t pos = 0;
-volatile int32_t delta = 0;
+volatile float delta = 0;
 volatile int32_t prevPos = 0;
-volatile int32_t error_displacement = 0;
-volatile int32_t prevError_displacement = 0;
+volatile float error_displacement = 0;
+volatile float prevError_displacement = 0;
 volatile float error_velocity = 0.0f;
 volatile float prevError_velocity = 0.0f;
 volatile float prop_displacement = 0.0f;
@@ -443,9 +445,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// input the rate limiter output into the PID controller
 			RateLimiter(target);
 
-			error_displacement = subTarget - pos;
+			error_displacement = (subTarget - pos)*countsToRad;
 			prop_displacement = Kp_displacement * error_displacement;
-			angularVelocity = (float)delta/dt;
+			angularVelocity = (float)(delta/dt)*countsToRad;
 
 			/*
 			if (abs(target - pos) >= 30) {
