@@ -359,74 +359,19 @@ bool Home(void) {
 }
 
 void RateLimiter(int32_t finalTarget) {
-	// TODO: Add rate limiter for target position --> increment target based on slew rate
-
-	float remaining = (float)finalTarget - subTarget_f;
-	int32_t position_tolerance = 5;
-	int8_t direction = 0;
-
-	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt)) {
-		subTarget_f = (float)finalTarget;
-		subTarget = finalTarget;
-		vel = 0.0f;
-		return;
-	}
-
-	if (remaining > 0.0f) {
-		direction = 1;
-	}
-	else if (remaining < 0.0f) {
-		direction = -1;
-	}
-	else {
-		direction = 0;
-	}
-
-	float vel_abs = fabsf(vel);
-	float brakingDistance = (vel_abs * vel_abs) / (2.0f * maxAccel);
-
-	if (vel > 0.0f && direction < 0) {
-		vel -= maxAccel * dt;
-		if (vel < 0.0f) vel = 0.0f;
-	}
-	else if (vel < 0.0f && direction > 0) {
-		vel += maxAccel * dt;
-		if (vel > 0.0f) vel = 0.0f;
-	}
-	else {
-		if (fabsf(remaining) <= brakingDistance) {
-			if (vel_abs > 0.0f) {
-				if (vel > 0.0f) {
-					vel -= maxAccel * dt;
-					if (vel < 0.0f) vel = 0.0f;
-				}
-				else if (vel < 0.0f) {
-					vel += maxAccel * dt;
-					if (vel > 0.0f) vel = 0.0f;
-				}
-			}
-		}
-		else {
-			if (fabsf(remaining) > position_tolerance) {
-				vel += maxAccel * dt * (float)direction;
-				if (vel > maxVel) vel = maxVel;
-				if (vel < -maxVel) vel = -maxVel;
-			}
-		}
-	}
-
-	subTarget_f += vel * dt;
-
-	if (direction > 0 && subTarget_f > (float)finalTarget) {
-		subTarget_f = (float)finalTarget;
-		vel = 0.0f;
-	}
-	else if (direction < 0 && subTarget_f < (float)finalTarget) {
-		subTarget_f = (float)finalTarget;
-		vel = 0.0f;
-	}
-
-	subTarget = (int32_t)subTarget_f;
+    float maxChangeCounts = 7.12f;  // 16 rad/s × (2797/2π) × 0.001s
+    
+    float remaining = (float)finalTarget - subTarget_f;
+    
+    if (remaining > maxChangeCounts) {
+        subTarget_f += maxChangeCounts;
+    } else if (remaining < -maxChangeCounts) {
+        subTarget_f -= maxChangeCounts;
+    } else {
+        subTarget_f = (float)finalTarget;
+    }
+    
+    subTarget = (int32_t)subTarget_f;
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
