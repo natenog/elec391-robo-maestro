@@ -64,8 +64,8 @@ float dt = 0.001f;
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
-float maxVel = 25000.0f;
-float maxAccel = 30000.0f;
+float maxVel = 2000.0f;
+float maxAccel = 5000.0f;
 
 
 MotorStruct Motor = {0};
@@ -499,7 +499,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			prevDeriv_displacement = deriv_displacement;
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
-			if (abs(subTarget - pos) < 30) {
+
+			if (abs(target - pos) < 30) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
