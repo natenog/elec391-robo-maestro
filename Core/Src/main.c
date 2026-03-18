@@ -87,6 +87,7 @@ volatile float output = 0.0f;
 volatile float percent = 0.0f;
 volatile float angularDisplacement = 0.0f;
 volatile float angularVelocity = 0.0f;
+volatile float rawVelocity = 0.0f;
 int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
@@ -392,7 +393,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			error_displacement = (subTarget - pos)*countsToRad;
 			prop_displacement = Kp_displacement * error_displacement;
-			angularVelocity = (float)(delta/dt)*countsToRad;
+			rawVelocity = (float)(delta / dt) * countsToRad;
+			angularVelocity = 0.8f * angularVelocity + 0.2f * rawVelocity;
 
 			/*
 			if (abs(target - pos) >= 30) {
