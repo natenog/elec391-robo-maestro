@@ -97,7 +97,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorForward(void);
 void MotorBackward(void);
 void MotorStop(void);
-void MotorSetSpeedPercent(float percent);
+void MotorSetSpeedPercentCh1(float percent);
+void MotorSetSpeedPercentCh2(float percent);
 //void MotorControl(MotorDirection direction);
 /* USER CODE END PFP */
 
@@ -150,7 +151,8 @@ int main(void)
   HAL_TIM_Base_Start(&HTIM_MOTOR);
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
-  MotorSetSpeedPercent(0);
+  MotorSetSpeedPercentCh1(0);
+  MotorSetSpeedPercentCh2(0);
   //__HAL_TIM_MOE_ENABLE(&htim1);
   //__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 999);
 
@@ -190,7 +192,6 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint32_t lastPrint = 0;
-  MotorForward();
   printf("\033[2J\033[H");
   while (1)
   {
@@ -227,6 +228,7 @@ int main(void)
 	if (now >= 10000) {
 		target = 2750;
 	}
+
 
     /* USER CODE END WHILE */
 
@@ -299,12 +301,14 @@ void SystemClock_Config(void)
 
 bool Home(void) {
 	enCtrl = false; // disable PID control loop
-	MotorSetSpeedPercent(0);
+	MotorSetSpeedPercentCh1(0);
+	MotorSetSpeedPercentCh2(0);
 	HAL_Delay(1000);
 
 	while (1) {
 		MotorBackward();
-		MotorSetSpeedPercent(50);
+		MotorSetSpeedPercentCh1(0);
+		MotorSetSpeedPercentCh2(50);
 
 		if (HAL_GPIO_ReadPin(HOME_PORT, HOME_PIN)) {
 			pos = 0; // reset encoder value to 0
@@ -433,18 +437,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				output = -100.0f;
 			}
 
-			// Switch direction depending on output sign
-			if (output > 0.0f) {
-				MotorForward();
-			}
-			else if (output < 0.0f) {
-				MotorBackward();
-				output *= -1.0f;
-			}
-			else {
-				MotorStop();
-			}
-
 			prevError = error;
 			prevDeriv = deriv;
 
@@ -454,13 +446,26 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				//integral = 0.0f;
 				//deriv = 0.0f;
 				prevDeriv = 0.0f;
-				MotorSetSpeedPercent(0);
+				MotorSetSpeedPercentCh1(0);
+				MotorSetSpeedPercentCh2(0);
 				//if (abs(target-pos) < 10) {
 				prop = 0.0f;
 				output = 0.0f;
 				//}
 			} else {
-				MotorSetSpeedPercent(output);
+				// Switch direction depending on output sign
+				if (output > 0.0f) {
+					MotorSetSpeedPercentCh1(output);
+					MotorSetSpeedPercentCh2(0);
+				}
+				else if (output < 0.0f) {
+					MotorSetSpeedPercentCh1(0);
+					MotorSetSpeedPercentCh2(output * -1.0f);
+				}
+				else {
+					MotorSetSpeedPercentCh1(0);
+					MotorSetSpeedPercentCh2(0);
+				}
 			}
 		}
 
@@ -482,10 +487,16 @@ void MotorStop(void) {
 	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_RESET);
 }
 
-void MotorSetSpeedPercent(float percent) {
+void MotorSetSpeedPercentCh1(float percent) {
     if(percent > 100) percent = 100;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
+}
+
+void MotorSetSpeedPercentCh2(float percent) {
+	if(percent > 100) percent = 100;
+	uint32_t speed = (percent / 100.0) * 63999;
+	__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_2, speed);
 }
 
 /* USER CODE END 4 */
