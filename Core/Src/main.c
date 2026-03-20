@@ -437,7 +437,7 @@ void RateLimiter(int32_t finalTarget) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	//float INT_MAX = 100.0f / Ki;
 	if (htim == &HTIM_PID) {
-		pos = __HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
+		pos = (int16_t)__HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
 		prevPos = pos;
 
