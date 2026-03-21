@@ -60,7 +60,7 @@ float Kd_displacement = 1.5f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
 uint8_t N = 25;
-float dt = 0.001f;
+const float dt = 0.001f;
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
@@ -69,9 +69,9 @@ float maxAccel = 5000.0f;
 
 
 MotorStruct Motor = {0};
-volatile int32_t pos = 0;
+volatile int16_t pos = 0;
 volatile float delta = 0;
-volatile int32_t prevPos = 0;
+volatile int16_t prevPos = 0;
 volatile float error_displacement = 0;
 volatile float prevError_displacement = 0;
 volatile float error_velocity = 0.0f;
@@ -191,11 +191,9 @@ int main(void)
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_TIM23_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_A);
   HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_B);
-  HAL_TIM_PWM_Start(&htim23, TIM_CHANNEL_1);
   HAL_TIM_Base_Start(&HTIM_MOTOR);
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
@@ -205,14 +203,6 @@ int main(void)
   //__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 999);
 
   /* USER CODE END 2 */
-
-  /* Initialize leds */
-  BSP_LED_Init(LED_GREEN);
-  BSP_LED_Init(LED_YELLOW);
-  BSP_LED_Init(LED_RED);
-
-  /* Initialize USER push-button, will be used to trigger an interrupt each time it's pressed.*/
-  BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 
   /* Initialize COM1 port (115200, 8 bits (7-bit data + 1 stop bit), no parity */
   BspCOMInit.BaudRate   = 115200;
@@ -230,11 +220,6 @@ int main(void)
   /* -- Sample board code to send message over COM1 port ---- */
   printf("Welcome to STM32 world !\n\r");
 
-  /* -- Sample board code to switch on leds ---- */
-  BSP_LED_On(LED_GREEN);
-  BSP_LED_On(LED_YELLOW);
-  BSP_LED_On(LED_RED);
-
   /* USER CODE END BSP */
 
   /* Infinite loop */
@@ -249,7 +234,7 @@ int main(void)
 			lastPrint = HAL_GetTick();
 			//printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
 			if (now < 10000) {
-				printf("%ld,%ld,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+				printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 			}
 		}
 
@@ -397,16 +382,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			error_displacement = (subTarget - pos)*countsToRad;
 			prop_displacement = Kp_displacement * error_displacement;
-			rawVelocity = (float)(delta / dt) * countsToRad;
-			angularVelocity = 0.8f * angularVelocity + 0.2f * rawVelocity;
-
-			/*
-			if (abs(target - pos) >= 30) {
-				integral += Ki * error * dt;
-			}
-			*/
 
 			deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt);
+
+			PD_output = prop_displacement + deriv_displacement;
+
+			prevError_displacement = error_displacement;
+			prevDeriv_displacement = deriv_displacement;
 
 			// Integral anti-windup
 			/*
@@ -418,7 +400,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			}
 			*/
 
-			PD_output = prop_displacement + deriv_displacement;
+			rawVelocity = (float)(delta / dt) * countsToRad;
+			angularVelocity = 0.8f * angularVelocity + 0.2f * rawVelocity;
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
@@ -433,9 +416,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			else if (output < -100.0f) {
 				output = -100.0f;
 			}
-
-			prevError_displacement = error_displacement;
-			prevDeriv_displacement = deriv_displacement;
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 
@@ -541,19 +521,6 @@ void MPU_Config(void)
   /* Enables the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
-}
-
-/**
-  * @brief BSP Push Button callback
-  * @param Button Specifies the pressed button
-  * @retval None
-  */
-void BSP_PB_Callback(Button_TypeDef Button)
-{
-  if (Button == BUTTON_USER)
-  {
-    BspButtonState = BUTTON_PRESSED;
-  }
 }
 
 /**
