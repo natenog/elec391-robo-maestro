@@ -50,14 +50,50 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+float Kp_displacement = 13.3f;
+float Ki_displacement = 1.2f;
+float Kd_displacement = 1.5f;
+float Kp_velocity = 0.6f;
+float Ki_velocity = 5.0f;
+uint8_t N = 25;
+const float dt = 0.001f;
+float countsToRad = (2.0f * M_PI) / 2797.0f;
+
+float vel = 0.0f;
+float maxVel = 2000.0f;
+float maxAccel = 5000.0f;
+
 volatile int16_t pos = 0;
 volatile float delta = 0;
 volatile int16_t prevPos = 0;
+
+volatile float error_displacement = 0;
+volatile float prevError_displacement = 0;
+volatile float error_velocity = 0.0f;
+volatile float prevError_velocity = 0.0f;
+volatile float prop_displacement = 0.0f;
+volatile float integral_displacement = 0.0f;
+volatile float deriv_displacement = 0.0f;
+volatile float prop_velocity = 0.0f;
+volatile float integral_velocity = 0.0f;
+volatile float prevDeriv_displacement = 0.0f;
+volatile float PD_output = 0.0f;
+volatile float output = 0.0f;
+volatile float percent = 0.0f;
+volatile float angularDisplacement = 0.0f;
+volatile float angularVelocity = 0.0f;
+int32_t target = 2000;
+int32_t subTarget = 0;
+float subTarget_f = 0.0f;
+//float position_snap_tolerance = 3.0f;
+bool enCtrl = true;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+void RateLimiter(int32_t target);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorSetSpeedPercentCh1(float percent);
 void MotorSetSpeedPercentCh2(float percent);
 /* USER CODE END PFP */
@@ -129,26 +165,17 @@ int main(void)
 		  //}
 	  }
 
-	  MotorSetSpeedPercentCh1(80.0);
-	  MotorSetSpeedPercentCh2(0.0);
+	  if (now >= 2000) {
+		  target = 300;
+	  }
 
-	  HAL_Delay(500);
+	  if (now >= 4000) {
+		  target = 1000;
+	  }
 
-	  MotorSetSpeedPercentCh1(0.0);
-	  MotorSetSpeedPercentCh2(0.0);
-
-	  HAL_Delay(500);
-
-	  MotorSetSpeedPercentCh1(0.0);
-	  MotorSetSpeedPercentCh2(80.0);
-
-	  HAL_Delay(500);
-
-	  MotorSetSpeedPercentCh1(0.0);
-	  MotorSetSpeedPercentCh2(0.0);
-
-	  HAL_Delay(500);
-
+	  if (now >= 6000) {
+		  target = 3000;
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -200,11 +227,158 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void RateLimiter(int32_t finalTarget) {
+	// TODO: Add rate limiter for target position --> increment target based on slew rate
+
+	float remaining = (float)finalTarget - subTarget_f;
+	int32_t position_tolerance = 5;
+	int8_t direction = 0;
+
+	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt)) {
+		subTarget_f = (float)finalTarget;
+		subTarget = finalTarget;
+		vel = 0.0f;
+		return;
+	}
+
+	if (remaining > 0.0f) {
+		direction = 1;
+	}
+	else if (remaining < 0.0f) {
+		direction = -1;
+	}
+	else {
+		direction = 0;
+	}
+
+	float vel_abs = fabsf(vel);
+	float brakingDistance = (vel_abs * vel_abs) / (2.0f * maxAccel);
+
+	if (vel > 0.0f && direction < 0) {
+		vel -= maxAccel * dt;
+		if (vel < 0.0f) vel = 0.0f;
+	}
+	else if (vel < 0.0f && direction > 0) {
+		vel += maxAccel * dt;
+		if (vel > 0.0f) vel = 0.0f;
+	}
+	else {
+		if (fabsf(remaining) <= brakingDistance) {
+			if (vel_abs > 0.0f) {
+				if (vel > 0.0f) {
+					vel -= maxAccel * dt;
+					if (vel < 0.0f) vel = 0.0f;
+				}
+				else if (vel < 0.0f) {
+					vel += maxAccel * dt;
+					if (vel > 0.0f) vel = 0.0f;
+				}
+			}
+		}
+		else {
+			if (fabsf(remaining) > position_tolerance) {
+				vel += maxAccel * dt * (float)direction;
+				if (vel > maxVel) vel = maxVel;
+				if (vel < -maxVel) vel = -maxVel;
+			}
+		}
+	}
+
+	subTarget_f += vel * dt;
+
+	if (direction > 0 && subTarget_f > (float)finalTarget) {
+		subTarget_f = (float)finalTarget;
+		vel = 0.0f;
+	}
+	else if (direction < 0 && subTarget_f < (float)finalTarget) {
+		subTarget_f = (float)finalTarget;
+		vel = 0.0f;
+	}
+
+	subTarget = (int32_t)subTarget_f;
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &HTIM_PID) {
 		pos = (int16_t)__HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
 		delta = (int16_t)(pos - prevPos);
 		prevPos = pos;
+
+		if (enCtrl) {
+			// PID controller method: Backwards Euler
+			// sampling frequency f = 1kHz --> sampling period dt = 0.001 s
+			// Integral term = i = dt * (z / (z - 1)) --> step response u[n] at each dt
+			// Derivative term = d = N / (1 + N*dt*(z / (z-1)))
+
+			// input the rate limiter output into the PID controller
+			RateLimiter(target);
+
+			error_displacement = (subTarget - pos)*countsToRad;
+			prop_displacement = Kp_displacement * error_displacement;
+
+			deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt);
+
+			PD_output = prop_displacement + deriv_displacement;
+
+			prevError_displacement = error_displacement;
+			prevDeriv_displacement = deriv_displacement;
+
+			// Integral anti-windup
+			/*
+			if (integral > INT_MAX) {
+				integral = INT_MAX;
+			}
+			else if (integral < -INT_MAX) {
+				integral = -INT_MAX;
+			}
+			*/
+
+			angularVelocity = (float)(delta/dt)*countsToRad;
+			error_velocity = PD_output - angularVelocity;
+
+			prop_velocity = Kp_velocity * error_velocity;
+			integral_velocity += Ki_velocity * error_velocity * dt;
+
+			output = prop_velocity + integral_velocity;
+
+			// Clamp output
+			if (output > 100.0f) {
+				output = 100.0f;
+			}
+			else if (output < -100.0f) {
+				output = -100.0f;
+			}
+
+			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
+
+			if (abs(target - pos) < 30) {
+				prevError_displacement = 0.0f;
+				//integral = 0.0f;
+				//deriv = 0.0f;
+				prevDeriv_displacement = 0.0f;
+				MotorSetSpeedPercentCh1(0);
+				MotorSetSpeedPercentCh2(0);
+				//if (abs(target-pos) < 10) {
+				prop_displacement = 0.0f;
+				integral_velocity = 0.0f;
+				output = 0.0f;
+				//}
+			} else {
+				// Switch direction depending on output sign
+				if (output > 0.0f) {
+					MotorSetSpeedPercentCh1(output);
+					MotorSetSpeedPercentCh2(0);
+				}
+				else if (output < 0.0f) {
+					MotorSetSpeedPercentCh1(0);
+					MotorSetSpeedPercentCh2(output * -1.0f);
+				}
+				else {
+					MotorSetSpeedPercentCh1(0);
+					MotorSetSpeedPercentCh2(0);
+				}
+			}
+		}
 	}
 }
 
