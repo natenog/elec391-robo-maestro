@@ -52,7 +52,6 @@
 /* USER CODE BEGIN PV */
 float Kp_displacement = 13.3f;
 float Ki_displacement = 1.2f;
-//float Kd = 1.2f;
 float Kd_displacement = 1.5f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
@@ -64,8 +63,6 @@ float vel = 0.0f;
 float maxVel = 2000.0f;
 float maxAccel = 5000.0f;
 
-
-MotorStruct Motor = {0};
 volatile int16_t pos = 0;
 volatile float delta = 0;
 volatile int16_t prevPos = 0;
@@ -90,9 +87,6 @@ float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
 bool solenoidOn = false;
-
-volatile uint32_t lastTimestamp = 0;
-volatile uint32_t currentTimestamp = 0;
 
 /*
 const Note notes[] = {
@@ -185,8 +179,8 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_A);
-  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_CHANNEL_MOTOR_B);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_A);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_B);
   HAL_TIM_Base_Start(&HTIM_MOTOR);
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
@@ -432,21 +426,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 
 	}
-}
-
-void MotorForward(void) {
-	HAL_GPIO_WritePin(MOTOR_IN1_PORT, MOTOR_IN1_PIN, GPIO_PIN_SET);
-	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_RESET);
-}
-
-void MotorBackward(void) {
-	HAL_GPIO_WritePin(MOTOR_IN1_PORT, MOTOR_IN1_PIN, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_SET);
-}
-
-void MotorStop(void) {
-	HAL_GPIO_WritePin(MOTOR_IN1_PORT, MOTOR_IN1_PIN, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(MOTOR_IN2_PORT, MOTOR_IN2_PIN, GPIO_PIN_RESET);
 }
 
 void MotorSetSpeedPercentCh1(float percent) {

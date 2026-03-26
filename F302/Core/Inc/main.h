@@ -59,7 +59,15 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
+#define HTIM_ENCODER htim1
+#define HTIM_PID htim2
+#define HTIM_MOTOR htim15
 
+#define TIM_MOTOR_CHANNEL_A TIM_CHANNEL_1
+#define TIM_MOTOR_CHANNEL_B TIM_CHANNEL_2
+
+#define HOME_PORT GPIOA
+#define HOME_PIN GPIO_PIN_1
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
