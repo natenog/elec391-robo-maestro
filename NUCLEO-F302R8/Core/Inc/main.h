@@ -73,6 +73,8 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define HTIM_ENCODER htim1
+#define HTIM_PID htim2
 #define HTIM_MOTOR htim15
 
 #define TIM_MOTOR_CHANNEL_A TIM_CHANNEL_1

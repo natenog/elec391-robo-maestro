@@ -50,7 +50,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+volatile int16_t pos = 0;
+volatile float delta = 0;
+volatile int16_t prevPos = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,10 +101,15 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
+  HAL_TIM_Base_Start_IT(&HTIM_PID);
   HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_A);
   HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_B);
   MotorSetSpeedPercentCh1(0.0);
   MotorSetSpeedPercentCh2(0.0);
+
+  printf("\033[2J\033[H");
+  uint32_t lastPrint = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -112,6 +119,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  uint32_t now = HAL_GetTick();
+
+	  if (now - lastPrint >= 100) { // every 100 ms
+		  lastPrint = HAL_GetTick();
+		  //printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
+		  //if (now < 10000) {
+			  printf("%ld, %d, %lf, %d\r\n", now, pos, delta, prevPos);
+		  //}
+	  }
+
 	  MotorSetSpeedPercentCh1(80.0);
 	  MotorSetSpeedPercentCh2(0.0);
 
@@ -131,6 +148,7 @@ int main(void)
 	  MotorSetSpeedPercentCh2(0.0);
 
 	  HAL_Delay(500);
+
   }
   /* USER CODE END 3 */
 }
@@ -182,6 +200,14 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if (htim == &HTIM_PID) {
+		pos = (int16_t)__HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
+		delta = (int16_t)(pos - prevPos);
+		prevPos = pos;
+	}
+}
+
 void MotorSetSpeedPercentCh1(float percent) {
     if(percent > 100) percent = 100;
     uint32_t speed = (percent / 100.0) * 63999;
@@ -192,6 +218,12 @@ void MotorSetSpeedPercentCh2(float percent) {
 	if(percent > 100) percent = 100;
 	uint32_t speed = (percent / 100.0) * 63999;
 	__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_2, speed);
+}
+
+int _write(int file, char *ptr, int len)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+    return len;
 }
 /* USER CODE END 4 */
 
