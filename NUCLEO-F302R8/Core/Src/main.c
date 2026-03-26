@@ -161,7 +161,7 @@ int main(void)
 		  lastPrint = HAL_GetTick();
 		  //printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
 		  //if (now < 10000) {
-			  printf("%ld, %d, %lf, %d\r\n", now, pos, delta, prevPos);
+		  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 		  //}
 	  }
 
