@@ -73,7 +73,10 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+#define HTIM_MOTOR htim15
 
+#define TIM_MOTOR_CHANNEL_A TIM_CHANNEL_1
+#define TIM_MOTOR_CHANNEL_B TIM_CHANNEL_2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

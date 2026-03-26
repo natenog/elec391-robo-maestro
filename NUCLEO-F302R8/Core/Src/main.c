@@ -24,7 +24,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,7 +56,8 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void MotorSetSpeedPercentCh1(float percent);
+void MotorSetSpeedPercentCh2(float percent);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -93,7 +99,10 @@ int main(void)
   MX_TIM15_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_A);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_B);
+  MotorSetSpeedPercentCh1(0.0);
+  MotorSetSpeedPercentCh2(0.0);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -101,6 +110,26 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+
+	  MotorSetSpeedPercentCh1(80.0);
+	  MotorSetSpeedPercentCh2(0.0);
+
+	  HAL_Delay(500);
+
+	  MotorSetSpeedPercentCh1(0.0);
+	  MotorSetSpeedPercentCh2(0.0);
+
+	  HAL_Delay(500);
+
+	  MotorSetSpeedPercentCh1(0.0);
+	  MotorSetSpeedPercentCh2(80.0);
+
+	  HAL_Delay(500);
+
+	  MotorSetSpeedPercentCh1(0.0);
+	  MotorSetSpeedPercentCh2(0.0);
+
+	  HAL_Delay(500);
 
     /* USER CODE BEGIN 3 */
   }
@@ -154,7 +183,17 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void MotorSetSpeedPercentCh1(float percent) {
+    if(percent > 100) percent = 100;
+    uint32_t speed = (percent / 100.0) * 63999;
+    __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
+}
 
+void MotorSetSpeedPercentCh2(float percent) {
+	if(percent > 100) percent = 100;
+	uint32_t speed = (percent / 100.0) * 63999;
+	__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_2, speed);
+}
 /* USER CODE END 4 */
 
 /**
