@@ -111,6 +111,7 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
+    /* USER CODE BEGIN 3 */
 	  MotorSetSpeedPercentCh1(80.0);
 	  MotorSetSpeedPercentCh2(0.0);
 
@@ -130,8 +131,6 @@ int main(void)
 	  MotorSetSpeedPercentCh2(0.0);
 
 	  HAL_Delay(500);
-
-    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
