@@ -1063,6 +1063,15 @@
           <name>$PROJ_DIR$/../Core/Src/main.c</name>
         </file>
         <file>
+          <name>$PROJ_DIR$/../Core/Src/gpio.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$/../Core/Src/tim.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$/../Core/Src/usart.c</name>
+        </file>
+        <file>
           <name>$PROJ_DIR$/../Core/Src/stm32f3xx_it.c</name>
         </file>
         <file>
