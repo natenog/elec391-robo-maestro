@@ -161,7 +161,19 @@ int main(void)
 		  lastPrint = HAL_GetTick();
 		  //printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
 		  //if (now < 10000) {
-		  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  __disable_irq();
+		  int16_t pos_copy = pos;
+		  int32_t sub_copy = subTarget;
+		  float prop_copy = prop_displacement;
+		  float int_copy = integral_displacement;
+		  float deriv_copy = deriv_displacement;
+		  float vel_copy = angularVelocity;
+		  float out_copy = output;
+		  __enable_irq();
+
+		  printf("%lu,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
+			(double)prop_copy, (double)int_copy, (double)deriv_copy,
+			(double)vel_copy, (double)out_copy);
 		  //}
 	  }
 
@@ -252,7 +264,8 @@ void RateLimiter(int32_t finalTarget) {
 	}
 
 	float vel_abs = fabsf(vel);
-	float brakingDistance = (vel_abs * vel_abs) / (2.0f * maxAccel);
+	float nextVel = vel_abs + maxAccel * dt;
+	float brakingDistance = (nextVel * nextVel) / (2.0f * maxAccel); // calculating one tick ahead due to sampling time 
 
 	if (vel > 0.0f && direction < 0) {
 		vel -= maxAccel * dt;
@@ -267,11 +280,21 @@ void RateLimiter(int32_t finalTarget) {
 			if (vel_abs > 0.0f) {
 				if (vel > 0.0f) {
 					vel -= maxAccel * dt;
-					if (vel < 0.0f) vel = 0.0f;
+					if (vel < maxAccel * dt) {
+						subTarget_f = (float)finalTarget;
+						subTarget = finalTarget;
+						vel = 0.0f;
+						return;
+					}
 				}
 				else if (vel < 0.0f) {
 					vel += maxAccel * dt;
-					if (vel > 0.0f) vel = 0.0f;
+					if (vel > -(maxAccel * dt)) {
+						subTarget_f = (float)finalTarget;
+						subTarget = finalTarget;
+						vel = 0.0f;
+						return;
+					}
 				}
 			}
 		}
@@ -301,7 +324,7 @@ void RateLimiter(int32_t finalTarget) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &HTIM_PID) {
 		pos = (int16_t)__HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
-		delta = (int16_t)(pos - prevPos);
+		delta = (float)(pos - prevPos);
 		prevPos = pos;
 
 		if (enCtrl) {
@@ -338,6 +361,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			prop_velocity = Kp_velocity * error_velocity;
 			integral_velocity += Ki_velocity * error_velocity * dt;
+			// Anti-windup
+			if (integral_velocity > 100.0f) {
+				integral_velocity = 100.0f;
+			}
+			else if (integral_velocity < -100.0f) {
+				integral_velocity = -100.0f;
+			}
 
 			output = prop_velocity + integral_velocity;
 
@@ -351,7 +381,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 
-			if (abs(target - pos) < 30) {
+			if (labs(target - pos) < 30) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
@@ -384,12 +414,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void MotorSetSpeedPercentCh1(float percent) {
     if(percent > 100) percent = 100;
+	if(percent < 0 )  percent = 0;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
 }
 
 void MotorSetSpeedPercentCh2(float percent) {
 	if(percent > 100) percent = 100;
+	if(percent < 0 )  percent = 0;
 	uint32_t speed = (percent / 100.0) * 63999;
 	__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_2, speed);
 }
