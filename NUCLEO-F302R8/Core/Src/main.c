@@ -56,7 +56,8 @@ float Kd_displacement = 1.5f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
 uint8_t N = 25;
-const float dt = 0.001f;
+const float dt_inner = 0.0005f;   // 2kHz 
+const float dt_outer = 0.001f;    // 1kHz
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
@@ -87,6 +88,7 @@ int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
+volatile uint8_t outerLoopCounter = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -161,6 +163,7 @@ int main(void)
 		  lastPrint = HAL_GetTick();
 		  //printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
 		  //if (now < 10000) {
+
 		  __disable_irq();
 		  int16_t pos_copy = pos;
 		  int32_t sub_copy = subTarget;
@@ -246,7 +249,7 @@ void RateLimiter(int32_t finalTarget) {
 	int32_t position_tolerance = 5;
 	int8_t direction = 0;
 
-	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt)) {
+	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt_outer)) {
 		subTarget_f = (float)finalTarget;
 		subTarget = finalTarget;
 		vel = 0.0f;
@@ -264,23 +267,23 @@ void RateLimiter(int32_t finalTarget) {
 	}
 
 	float vel_abs = fabsf(vel);
-	float nextVel = vel_abs + maxAccel * dt;
-	float brakingDistance = (nextVel * nextVel) / (2.0f * maxAccel); // calculating one tick ahead due to sampling time 
+	float nextVel = vel_abs + maxAccel * dt_outer;
+	float brakingDistance = (nextVel * nextVel) / (2.0f * maxAccel); // calculating one tick ahead due to sampling time
 
 	if (vel > 0.0f && direction < 0) {
-		vel -= maxAccel * dt;
+		vel -= maxAccel * dt_outer;
 		if (vel < 0.0f) vel = 0.0f;
 	}
 	else if (vel < 0.0f && direction > 0) {
-		vel += maxAccel * dt;
+		vel += maxAccel * dt_outer;
 		if (vel > 0.0f) vel = 0.0f;
 	}
 	else {
 		if (fabsf(remaining) <= brakingDistance) {
 			if (vel_abs > 0.0f) {
 				if (vel > 0.0f) {
-					vel -= maxAccel * dt;
-					if (vel < maxAccel * dt) {
+					vel -= maxAccel * dt_outer;
+					if (vel < maxAccel * dt_outer) {
 						subTarget_f = (float)finalTarget;
 						subTarget = finalTarget;
 						vel = 0.0f;
@@ -288,8 +291,8 @@ void RateLimiter(int32_t finalTarget) {
 					}
 				}
 				else if (vel < 0.0f) {
-					vel += maxAccel * dt;
-					if (vel > -(maxAccel * dt)) {
+					vel += maxAccel * dt_outer;
+					if (vel > -(maxAccel * dt_outer)) {
 						subTarget_f = (float)finalTarget;
 						subTarget = finalTarget;
 						vel = 0.0f;
@@ -300,14 +303,14 @@ void RateLimiter(int32_t finalTarget) {
 		}
 		else {
 			if (fabsf(remaining) > position_tolerance) {
-				vel += maxAccel * dt * (float)direction;
+				vel += maxAccel * dt_outer * (float)direction;
 				if (vel > maxVel) vel = maxVel;
 				if (vel < -maxVel) vel = -maxVel;
 			}
 		}
 	}
 
-	subTarget_f += vel * dt;
+	subTarget_f += vel * dt_outer;
 
 	if (direction > 0 && subTarget_f > (float)finalTarget) {
 		subTarget_f = (float)finalTarget;
@@ -333,18 +336,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// Integral term = i = dt * (z / (z - 1)) --> step response u[n] at each dt
 			// Derivative term = d = N / (1 + N*dt*(z / (z-1)))
 
-			// input the rate limiter output into the PID controller
-			RateLimiter(target);
+			outerLoopCounter++;
 
-			error_displacement = (subTarget - pos)*countsToRad;
-			prop_displacement = Kp_displacement * error_displacement;
+			// Outer loop: position PD at 1kHz (every 2nd tick)
+			if (outerLoopCounter >= 2) {
+				outerLoopCounter = 0;
 
-			deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt);
+				// input the rate limiter output into the PID controller
+				RateLimiter(target);
 
-			PD_output = prop_displacement + deriv_displacement;
+				error_displacement = (subTarget - pos) * countsToRad;
+				prop_displacement = Kp_displacement * error_displacement;
 
-			prevError_displacement = error_displacement;
-			prevDeriv_displacement = deriv_displacement;
+				deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt_outer);
+
+				PD_output = prop_displacement + deriv_displacement;
+
+				prevError_displacement = error_displacement;
+				prevDeriv_displacement = deriv_displacement;
+			}
 
 			// Integral anti-windup
 			/*
@@ -356,11 +366,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			}
 			*/
 
-			angularVelocity = (float)(delta/dt)*countsToRad;
+			// Inner loop: velocity PI at 2kHz (every tick)
+			angularVelocity = (float)(delta / dt_inner) * countsToRad;
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
-			integral_velocity += Ki_velocity * error_velocity * dt;
+			integral_velocity += Ki_velocity * error_velocity * dt_inner;
 			// Anti-windup
 			if (integral_velocity > 100.0f) {
 				integral_velocity = 100.0f;
@@ -380,7 +391,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			}
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
-
+			
 			if (labs(target - pos) < 30) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
