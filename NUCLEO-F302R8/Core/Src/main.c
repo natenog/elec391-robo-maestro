@@ -63,7 +63,7 @@ float countsToRad = (2.0f * M_PI) / 2797.0f;
 float vel = 0.0f;
 float maxVel = 10000.0f;
 float maxAccel = 15000.0f;
-float alpha = 0.1;
+float alpha = 0.05;
 
 volatile int16_t pos = 0;
 volatile float delta = 0;
@@ -168,7 +168,7 @@ int main(void)
 
 	  if (now - lastPrint >= 100) { // every 100 ms
 		  lastPrint = HAL_GetTick();
-
+		  /*
 		  switch (state) {
 		      case HOME:
 		          printf("FSM State: HOME\n");
@@ -183,20 +183,27 @@ int main(void)
 		          printf("FSM State: PLAY\n");
 		          break;
 		      case DONE:
-		          printf("FSM State: DONE\n");
+		          //printf("FSM State: DONE\n");
 		          break;
 		      default:
 		          printf("FSM State: UNKNOWN\n");
 		          break;
 		  }
 		  if (done_move == false) {
-			  printf("Pos: %d, Vel: %lf, FSM Target = %d\r\n", pos, angularVelocity, target_FSM);
+			  printf("Time: %ld, Pos: %d, Vel: %lf, FSM Target = %d\r\n", now, pos, angularVelocity, target_FSM);
+		  }
+		  else if (state == DONE) {
+			  continue;
 		  }
 		  else if (done_move == true) {
-			  printf("Done moving! Start playing.\r\n");
+			  printf("Time: %ld, Done moving! Start playing.\r\n", now);
+		  }
+		  */
+
+		  if (now < 18000) {
+			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 		  }
 
-		  //printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 		  /*
 		  if (done_move == false) {
 			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
