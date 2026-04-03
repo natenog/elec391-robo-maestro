@@ -30,7 +30,9 @@ typedef struct {
 	uint8_t solenoid5;
 } Solenoids;
 
-extern float subTarget_f;
+extern FSM_State state;
+extern uint16_t target_FSM;
+extern float keyPosition_mm;
 
 #define SOLENOID_PORT GPIOB
 #define SOLENOID_1_PIN GPIO_PIN_5
@@ -40,6 +42,7 @@ extern float subTarget_f;
 #define SOLENOID_5_PIN GPIO_PIN_9
 
 /* Exported functions prototypes ---------------------------------------------*/
+void FSM(void);
 void FireSolenoid(uint8_t solenoid);
 void SolenoidUpdate(void);
 void StopAllSolenoids(void);
