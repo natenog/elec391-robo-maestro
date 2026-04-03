@@ -183,8 +183,11 @@ void FSM(void) {
 
     case MOVE:
         // Map the current note to find motor target and solenoid
-        currentNote = MapNote(song[song_index].key_mm);
-        target_FSM = currentNote.motorTarget;
+        if (!moveStarted) {
+            currentNote = MapNote(song[song_index].key_mm);
+            target_FSM = currentNote.motorTarget;
+            moveStarted = true;
+        }
 
         // done_move is set from PID controller when motor has stopped inside the deadzone
         if (done_move) {
