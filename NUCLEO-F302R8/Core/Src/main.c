@@ -387,21 +387,19 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			prop_velocity = Kp_velocity * error_velocity;
 			integral_velocity += Ki_velocity * error_velocity * dt_inner;
 			// Anti-windup
-			if (integral_velocity > 100.0f) {
-				integral_velocity = 100.0f;
-			}
-			else if (integral_velocity < -100.0f) {
-				integral_velocity = -100.0f;
-			}
-
-			output = prop_velocity + integral_velocity;
-
+			float raw_output = prop_velocity + integral_velocity;
+			
 			// Clamp output
-			if (output > 100.0f) {
+			if (raw_output > 100.0f) {
 				output = 100.0f;
-			}
-			else if (output < -100.0f) {
+			} else if (raw_output < -100.0f) {
 				output = -100.0f;
+			} else {
+				output = raw_output;
+			}
+			// only integrates when output is NOT saturated or when the error would reduce the integral 
+			if (fabsf(raw_output) < 100.0f || (error_velocity * integral_velocity) < 0.0f) {
+				integral_velocity += Ki_velocity * error_velocity * dt_inner;
 			}
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
