@@ -50,19 +50,19 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-float Kp_displacement = 13.3f;
+float Kp_displacement = 4.5f;
 float Ki_displacement = 1.2f;
-float Kd_displacement = 1.5f;
+float Kd_displacement = 0.3f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
-uint8_t N = 25;
+float N = 6.5;
 const float dt_inner = 0.0005f;   // 2kHz 
 const float dt_outer = 0.001f;    // 1kHz
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
-float maxVel = 2000.0f;
-float maxAccel = 5000.0f;
+float maxVel = 10000.0f;
+float maxAccel = 15000.0f;
 
 volatile int16_t pos = 0;
 volatile float delta = 0;
@@ -134,10 +134,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM15_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
@@ -157,13 +157,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
 	  uint32_t now = HAL_GetTick();
 
 	  if (now - lastPrint >= 100) { // every 100 ms
 		  lastPrint = HAL_GetTick();
-		  //printf("Pos=%ld  d=%ld  deriv=%lf  int=%lf  out=%lf  err=%ld  prevErr=%ld\r\n", pos, delta, deriv, integral, output, error, prevError);
+		  if (now < 10000) {
+			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  }
+		  //printf("%d\r\n", pos);
 		  //if (now < 10000) {
-
+		  /*
 		  __disable_irq();
 		  int16_t pos_copy = pos;
 		  int32_t sub_copy = subTarget;
@@ -177,7 +181,7 @@ int main(void)
 		  printf("%lu,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
 			(double)prop_copy, (double)int_copy, (double)deriv_copy,
 			(double)vel_copy, (double)out_copy);
-		  //}
+		  //}		   */
 	  }
 
 	  if (now >= 2000) {
