@@ -30,6 +30,8 @@ typedef struct {
 	uint8_t solenoid5;
 } Solenoids;
 
+extern float subTarget_f;
+
 #define SOLENOID_PORT GPIOB
 #define SOLENOID_1_PIN GPIO_PIN_5
 #define SOLENOID_2_PIN GPIO_PIN_6

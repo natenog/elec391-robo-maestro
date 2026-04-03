@@ -103,13 +103,13 @@ NoteMapping MapNote(float keyPosition_mm) {
 
     for (int i = 0; i < 5; i++) {
         float wrefPos = keyPosition_mm - offsets[i];
-        /*
+
         float dist = fabsf(wrefPos * MM_TO_COUNTS - subTarget_f);
         if (dist < bestDist) {
             bestDist = dist;
             best = i;
         }
-        */
+
     }
 
     float wrefPos = keyPosition_mm - offsets[best];
