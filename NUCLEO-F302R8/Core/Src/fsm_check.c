@@ -29,17 +29,17 @@
 // Piano key positions in mm from C4 (home)
 #define KEY_C4   0.0f
 #define KEY_CS4  14.0f
-#define KEY_D4   23.5f
+#define KEY_D4   21.5f
 #define KEY_DS4  37.5f
-#define KEY_E4   47.0f
-#define KEY_F4   70.5f
+#define KEY_E4   43.0f
+#define KEY_F4   64.5f
 #define KEY_FS4  84.0f
-#define KEY_G4   94.0f
+#define KEY_G4   86.0f
 #define KEY_GS4  107.5f
-#define KEY_A4   117.5f
+#define KEY_A4   107.5f
 #define KEY_AS4  131.0f
-#define KEY_B4   141.0f
-#define KEY_C5   165.5f
+#define KEY_B4   129.0f
+#define KEY_C5   150.5f
 
 // Solenoid offsets from W_ref in mm
 #define OFFSET_W1    -45.0f
@@ -78,8 +78,14 @@ NoteMapping currentNote;
 // ============ SONG DATA ============
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-    {KEY_E4,  1500},        // placeholder — replace with your song
-    {KEY_G4,  4000},     // placeholder
+	//{KEY_C4,	0},
+	{KEY_D4,	2000},
+	{KEY_E4,	4000},
+	{KEY_F4,	6000},
+	{KEY_G4,	8000},
+	{KEY_A4,	10000},
+	{KEY_B4,	12000},
+	{KEY_C5,	14000},
 };
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
@@ -202,7 +208,6 @@ void FSM(void) {
         if (now - song_start_time >= song[song_index].time_ms) {
             //FireSolenoid(currentNote.solenoid);
         	FireSolenoid(SOL_W1);
-            song_index++;
 
             if (song_index >= numNotes) {
                 state = DONE;
@@ -215,7 +220,8 @@ void FSM(void) {
                     state = PLAY; // stay here, just fire a different solenoid next time
                 }
                 else {
-                	if (now - song[song_index].time_ms > (SOLENOID_PULSE_MS + 400)) {
+                	if (now - song[song_index].time_ms > SOLENOID_PULSE_MS) {
+                		song_index++;
                 		state = MOVE; // need to move carriage to new position
                 	}
                 }
