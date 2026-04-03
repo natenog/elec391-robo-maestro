@@ -199,6 +199,9 @@ void FSM(void) {
 
     case PLAY:
         // Wait until it's time to play this note
+        if (solenoidActive) {
+            break;
+        }
         if (now - song_start_time >= song[song_index].time_ms) {
             //FireSolenoid(currentNote.solenoid);
         	FireSolenoid(SOL_W1);
