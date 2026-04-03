@@ -63,6 +63,7 @@ float countsToRad = (2.0f * M_PI) / 2797.0f;
 float vel = 0.0f;
 float maxVel = 10000.0f;
 float maxAccel = 15000.0f;
+float alpha = 0.1;
 
 volatile int16_t pos = 0;
 volatile float delta = 0;
@@ -83,6 +84,8 @@ volatile float output = 0.0f;
 volatile float percent = 0.0f;
 volatile float angularDisplacement = 0.0f;
 volatile float angularVelocity = 0.0f;
+volatile float rawVelocity = 0.0f;
+
 int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
@@ -402,7 +405,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			}
 
 			// Inner loop: velocity PI at 2kHz (every tick)
-			angularVelocity = (float)(delta / dt_inner) * countsToRad;
+			rawVelocity = (float)(delta / dt_inner) * countsToRad;
+			angularVelocity = alpha * rawVelocity + (1.0f - alpha) * angularVelocity;
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
