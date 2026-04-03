@@ -37,6 +37,11 @@ typedef struct {
 #define SOLENOID_4_PIN GPIO_PIN_8
 #define SOLENOID_5_PIN GPIO_PIN_9
 
+/* Exported functions prototypes ---------------------------------------------*/
+void FireSolenoid(uint8_t solenoid);
+void SolenoidUpdate(void);
+void StopAllSolenoids(void);
+
 #ifdef __cplusplus
 }
 #endif

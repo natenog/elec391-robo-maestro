@@ -85,9 +85,9 @@ uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 // ============ FUNCTION PROTOTYPES ============
 void FSM(void);
 NoteMapping MapNote(float keyPosition_mm);
-void FireSolenoid(uint8_t solenoid);
-void SolenoidUpdate(void);
-void StopAllSolenoids(void);
+//void FireSolenoid(uint8_t solenoid);
+//void SolenoidUpdate(void);
+//void StopAllSolenoids(void);
 
 // ============ NOTE MAPPING ============
 // Given a key position in mm, finds the best solenoid and motor position
@@ -103,11 +103,13 @@ NoteMapping MapNote(float keyPosition_mm) {
 
     for (int i = 0; i < 5; i++) {
         float wrefPos = keyPosition_mm - offsets[i];
+        /*
         float dist = fabsf(wrefPos * MM_TO_COUNTS - subTarget_f);
         if (dist < bestDist) {
             bestDist = dist;
             best = i;
         }
+        */
     }
 
     float wrefPos = keyPosition_mm - offsets[best];

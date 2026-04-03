@@ -21,6 +21,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "fsm.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -88,6 +89,7 @@ int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
+bool doneMove = false;
 volatile uint8_t outerLoopCounter = 0;
 /* USER CODE END PV */
 
@@ -152,6 +154,8 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  //StopAllSolenoids();
+  //FireSolenoid(1);
   while (1)
   {
     /* USER CODE END WHILE */
@@ -162,8 +166,12 @@ int main(void)
 
 	  if (now - lastPrint >= 100) { // every 100 ms
 		  lastPrint = HAL_GetTick();
-		  if (now < 10000) {
+		  if (doneMove == false) {
 			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  }
+		  else if (doneMove == true) {
+			  printf("Done moving! Start playing.\r\n");
+			  doneMove = false;
 		  }
 		  //printf("%d\r\n", pos);
 		  //if (now < 10000) {
@@ -183,6 +191,7 @@ int main(void)
 			(double)vel_copy, (double)out_copy);
 		  //}		   */
 	  }
+	  //SolenoidUpdate();
 
 	  if (now >= 2000) {
 		  target = 300;
@@ -195,6 +204,7 @@ int main(void)
 	  if (now >= 6000) {
 		  target = 3000;
 	  }
+
   }
   /* USER CODE END 3 */
 }
@@ -396,7 +406,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 			
-			if (labs(target - pos) < 30) {
+			if (labs(target - pos) < 30 && angularVelocity < 1.0f) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
@@ -407,6 +417,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				prop_displacement = 0.0f;
 				integral_velocity = 0.0f;
 				output = 0.0f;
+				doneMove = true;
 				//}
 			} else {
 				// Switch direction depending on output sign
