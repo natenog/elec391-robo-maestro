@@ -29,7 +29,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <math.h>
 /* USER CODE END Includes */
 
@@ -89,14 +88,14 @@ int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
-bool doneMove = false;
+bool done_move = false;
 volatile uint8_t outerLoopCounter = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void RateLimiter(int32_t target);
+void RateLimiter(uint16_t finalTarget);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorSetSpeedPercentCh1(float percent);
 void MotorSetSpeedPercentCh2(float percent);
@@ -166,13 +165,43 @@ int main(void)
 
 	  if (now - lastPrint >= 100) { // every 100 ms
 		  lastPrint = HAL_GetTick();
-		  if (doneMove == false) {
+
+		  switch (state) {
+		      case HOME:
+		          printf("FSM State: HOME\n");
+		          break;
+		      case WAIT:
+		          printf("FSM State: WAIT\n");
+		          break;
+		      case MOVE:
+		          printf("FSM State: MOVE\n");
+		          break;
+		      case PLAY:
+		          printf("FSM State: PLAY\n");
+		          break;
+		      case DONE:
+		          printf("FSM State: DONE\n");
+		          break;
+		      default:
+		          printf("FSM State: UNKNOWN\n");
+		          break;
+		  }
+		  if (done_move == false) {
+			  printf("Pos: %d, Vel: %lf, FSM Target = %d\r\n", pos, angularVelocity, target_FSM);
+		  }
+		  else if (done_move == true) {
+			  printf("Done moving! Start playing.\r\n");
+		  }
+
+		  //printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  /*
+		  if (done_move == false) {
 			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 		  }
-		  else if (doneMove == true) {
+		  else if (done_move == true) {
 			  printf("Done moving! Start playing.\r\n");
-			  doneMove = false;
 		  }
+		  */
 		  //printf("%d\r\n", pos);
 		  //if (now < 10000) {
 		  /*
@@ -192,7 +221,7 @@ int main(void)
 		  //}		   */
 	  }
 	  //SolenoidUpdate();
-
+	  /*
 	  if (now >= 2000) {
 		  target = 300;
 	  }
@@ -204,6 +233,8 @@ int main(void)
 	  if (now >= 6000) {
 		  target = 3000;
 	  }
+	  */
+	  FSM();
 
   }
   /* USER CODE END 3 */
@@ -256,7 +287,7 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void RateLimiter(int32_t finalTarget) {
+void RateLimiter(uint16_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
 	float remaining = (float)finalTarget - subTarget_f;
@@ -335,7 +366,7 @@ void RateLimiter(int32_t finalTarget) {
 		vel = 0.0f;
 	}
 
-	subTarget = (int32_t)subTarget_f;
+	subTarget = (int16_t)subTarget_f;
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
@@ -357,7 +388,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				outerLoopCounter = 0;
 
 				// input the rate limiter output into the PID controller
-				RateLimiter(target);
+				RateLimiter(target_FSM);
 
 				error_displacement = (subTarget - pos) * countsToRad;
 				prop_displacement = Kp_displacement * error_displacement;
@@ -370,41 +401,34 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				prevDeriv_displacement = deriv_displacement;
 			}
 
-			// Integral anti-windup
-			/*
-			if (integral > INT_MAX) {
-				integral = INT_MAX;
-			}
-			else if (integral < -INT_MAX) {
-				integral = -INT_MAX;
-			}
-			*/
-
 			// Inner loop: velocity PI at 2kHz (every tick)
 			angularVelocity = (float)(delta / dt_inner) * countsToRad;
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
 			integral_velocity += Ki_velocity * error_velocity * dt_inner;
-			// Anti-windup
+
 			float raw_output = prop_velocity + integral_velocity;
-			
+
 			// Clamp output
 			if (raw_output > 100.0f) {
 				output = 100.0f;
-			} else if (raw_output < -100.0f) {
+			}
+			else if (raw_output < -100.0f) {
 				output = -100.0f;
-			} else {
+			}
+			else {
 				output = raw_output;
 			}
-			// only integrates when output is NOT saturated or when the error would reduce the integral 
+
+			// only integrates when output is NOT saturated or when the error would reduce the integral
 			if (fabsf(raw_output) < 100.0f || (error_velocity * integral_velocity) < 0.0f) {
 				integral_velocity += Ki_velocity * error_velocity * dt_inner;
 			}
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 			
-			if (labs(target - pos) < 30 && angularVelocity < 1.0f) {
+			if (labs(target_FSM - pos) < 30 && angularVelocity < 1.0f) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
@@ -415,7 +439,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				prop_displacement = 0.0f;
 				integral_velocity = 0.0f;
 				output = 0.0f;
-				doneMove = true;
+				done_move = true;
 				//}
 			} else {
 				// Switch direction depending on output sign
