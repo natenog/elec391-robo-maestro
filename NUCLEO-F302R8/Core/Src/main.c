@@ -93,6 +93,7 @@ float subTarget_f = 0.0f;
 bool enCtrl = true;
 bool done_move = false;
 volatile uint8_t outerLoopCounter = 0;
+static uint8_t startupCount = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -413,22 +414,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			// Inner loop: velocity PI at 2kHz (every tick)
 			rawVelocity = (float)(delta / dt_inner) * countsToRad;
-			angularVelocity = alpha * rawVelocity + (1.0f - alpha) * angularVelocity;
+
+			if (startupCount < 10) {
+				angularVelocity = 0.0f;
+				startupCount++;
+			} else {
+				angularVelocity = alpha * rawVelocity + (1.0f - alpha) * angularVelocity;
+			}
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
-			integral_velocity += Ki_velocity * error_velocity * dt_inner;
 
 			float raw_output = prop_velocity + integral_velocity;
 
 			// Clamp output
 			if (raw_output > 100.0f) {
 				output = 100.0f;
-			}
-			else if (raw_output < -100.0f) {
+			} else if (raw_output < -100.0f) {
 				output = -100.0f;
-			}
-			else {
+			} else {
 				output = raw_output;
 			}
 
@@ -439,7 +443,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 			
-			if (labs(target_FSM - pos) < 30 && angularVelocity < 1.0f) {
+			if (labs(target_FSM - pos) < 30 && fabsf(angularVelocity) < 1.0f) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
