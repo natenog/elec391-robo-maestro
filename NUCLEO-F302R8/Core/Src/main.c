@@ -68,6 +68,7 @@ float alpha = 0.05;
 volatile int16_t pos = 0;
 volatile float delta = 0;
 volatile int16_t prevPos = 0;
+volatile int32_t lastTargetFSM = 0;
 
 volatile float error_displacement = 0;
 volatile float prevError_displacement = 0;
@@ -454,7 +455,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				prop_displacement = 0.0f;
 				integral_velocity = 0.0f;
 				output = 0.0f;
-				done_move = true;
+				if (target_FSM != lastTargetFSM) {
+					lastTargetFSM = target_FSM;
+					done_move = true;
+				}
 				//}
 			} else {
 				// Switch direction depending on output sign

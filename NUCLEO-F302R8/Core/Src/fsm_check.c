@@ -211,6 +211,7 @@ void FSM(void) {
         if (now - song_start_time >= song[song_index].time_ms) {
             //FireSolenoid(currentNote.solenoid);
         	FireSolenoid(SOL_W1);
+            song_index++;
 
             if (song_index >= numNotes) {
                 state = DONE;
@@ -223,13 +224,10 @@ void FSM(void) {
                     state = PLAY; // stay here, just fire a different solenoid next time
                 }
                 else {
-                	if (now - song[song_index].time_ms > SOLENOID_PULSE_MS) {
-                		song_index++;
                 		state = MOVE; // need to move carriage to new position
                 	}
                 }
             }
-        }
         break;
 
     case DONE:
