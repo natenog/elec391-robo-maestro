@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f3xx_hal.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -36,7 +37,8 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+extern float subTarget_f;
+extern bool done_move;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -65,9 +67,6 @@ void Error_Handler(void);
 
 #define TIM_MOTOR_CHANNEL_A TIM_CHANNEL_1
 #define TIM_MOTOR_CHANNEL_B TIM_CHANNEL_2
-
-#define HOME_PORT GPIOA
-#define HOME_PIN GPIO_PIN_1
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

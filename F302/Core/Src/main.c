@@ -21,6 +21,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "fsm.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,7 +29,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <math.h>
 /* USER CODE END Includes */
 
@@ -50,22 +50,26 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-float Kp_displacement = 13.3f;
+float Kp_displacement = 4.5f;
 float Ki_displacement = 1.2f;
-float Kd_displacement = 1.5f;
+float Kd_displacement = 0.3f;
 float Kp_velocity = 0.6f;
 float Ki_velocity = 5.0f;
-uint8_t N = 25;
-const float dt = 0.001f;
+float N = 6.5;
+const float dt_inner = 0.0005f;   // 2kHz
+const float dt_outer = 0.001f;    // 1kHz
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
-float maxVel = 2000.0f;
-float maxAccel = 5000.0f;
+float maxVel = 10000.0f;
+float maxAccel = 15000.0f;
+float alpha = 0.05;
 
 volatile int16_t pos = 0;
 volatile float delta = 0;
 volatile int16_t prevPos = 0;
+volatile int32_t lastTargetFSM = 0;
+
 volatile float error_displacement = 0;
 volatile float prevError_displacement = 0;
 volatile float error_velocity = 0.0f;
@@ -81,61 +85,23 @@ volatile float output = 0.0f;
 volatile float percent = 0.0f;
 volatile float angularDisplacement = 0.0f;
 volatile float angularVelocity = 0.0f;
+volatile float rawVelocity = 0.0f;
+
 int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
 bool enCtrl = true;
-bool solenoidOn = false;
-
-/*
-const Note notes[] = {
-	{"C2", },
-	{"D2", },
-	{"E2", },
-	{"F2", },
-	{"G2", },
-	{"A2", },
-	{"B2", },
-	{"C3", },
-	{"D3", },
-	{"E3", },
-	{"F3", },
-	{"G3", },
-	{"A3", },
-	{"B3", },
-	{"C4", },
-	{"D4", },
-	{"E4", },
-	{"F4", },
-	{"G4", },
-	{"A4", },
-	{"B4", },
-	{"C5", },
-	{"D5", },
-	{"E5", },
-	{"F5", },
-	{"G5", },
-	{"A5", },
-	{"B5", },
-	{"C6", },
-	{"D6", },
-	{"E6", },
-	{"F6", }
-};
-*/
+bool done_move = false;
+volatile uint8_t outerLoopCounter = 0;
+static uint8_t startupCount = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-bool Home(void);
-void RateLimiter(int32_t target);
+void RateLimiter(uint16_t finalTarget);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
-void MotorForward(void);
-void MotorBackward(void);
-void MotorStop(void);
-//void SolenoidPress(int pressTime_ms);
 void MotorSetSpeedPercentCh1(float percent);
 void MotorSetSpeedPercentCh2(float percent);
 /* USER CODE END PFP */
@@ -174,27 +140,114 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM15_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_A);
-  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_B);
-  HAL_TIM_Base_Start(&HTIM_MOTOR);
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
-  MotorSetSpeedPercentCh1(0);
-  MotorSetSpeedPercentCh2(0);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_A);
+  HAL_TIM_PWM_Start(&HTIM_MOTOR, TIM_MOTOR_CHANNEL_B);
+  MotorSetSpeedPercentCh1(0.0);
+  MotorSetSpeedPercentCh2(0.0);
+
+  printf("\033[2J\033[H");
+  uint32_t lastPrint = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  //StopAllSolenoids();
+  //FireSolenoid(1);
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	  uint32_t now = HAL_GetTick();
+
+	  if (now - lastPrint >= 100) { // every 100 ms
+		  lastPrint = HAL_GetTick();
+		  /*
+		  switch (state) {
+		      case HOME:
+		          printf("FSM State: HOME\n");
+		          break;
+		      case WAIT:
+		          printf("FSM State: WAIT\n");
+		          break;
+		      case MOVE:
+		          printf("FSM State: MOVE\n");
+		          break;
+		      case PLAY:
+		          printf("FSM State: PLAY\n");
+		          break;
+		      case DONE:
+		          //printf("FSM State: DONE\n");
+		          break;
+		      default:
+		          printf("FSM State: UNKNOWN\n");
+		          break;
+		  }
+		  if (done_move == false) {
+			  printf("Time: %ld, Pos: %d, Vel: %lf, FSM Target = %d\r\n", now, pos, angularVelocity, target_FSM);
+		  }
+		  else if (state == DONE) {
+			  continue;
+		  }
+		  else if (done_move == true) {
+			  printf("Time: %ld, Done moving! Start playing.\r\n", now);
+		  }
+		  */
+
+		  if (now < 18000) {
+			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  }
+
+		  /*
+		  if (done_move == false) {
+			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  }
+		  else if (done_move == true) {
+			  printf("Done moving! Start playing.\r\n");
+		  }
+		  */
+		  //printf("%d\r\n", pos);
+		  //if (now < 10000) {
+		  /*
+		  __disable_irq();
+		  int16_t pos_copy = pos;
+		  int32_t sub_copy = subTarget;
+		  float prop_copy = prop_displacement;
+		  float int_copy = integral_displacement;
+		  float deriv_copy = deriv_displacement;
+		  float vel_copy = angularVelocity;
+		  float out_copy = output;
+		  __enable_irq();
+
+		  printf("%lu,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
+			(double)prop_copy, (double)int_copy, (double)deriv_copy,
+			(double)vel_copy, (double)out_copy);
+		  //}		   */
+	  }
+	  //SolenoidUpdate();
+	  /*
+	  if (now >= 2000) {
+		  target = 300;
+	  }
+
+	  if (now >= 4000) {
+		  target = 1000;
+	  }
+
+	  if (now >= 6000) {
+		  target = 3000;
+	  }
+	  */
+	  FSM();
+
   }
   /* USER CODE END 3 */
 }
@@ -215,7 +268,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -225,12 +280,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -244,41 +299,14 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-bool Home(void) {
-	enCtrl = false; // disable PID control loop
-	MotorSetSpeedPercentCh1(0);
-	MotorSetSpeedPercentCh2(0);
-	HAL_Delay(1000);
-
-	while (1) {
-		MotorBackward();
-		MotorSetSpeedPercentCh1(0);
-		MotorSetSpeedPercentCh2(50);
-
-		if (HAL_GPIO_ReadPin(HOME_PORT, HOME_PIN)) {
-			MotorStop();
-			MotorSetSpeedPercentCh1(0);
-			MotorSetSpeedPercentCh2(0);
-			HAL_Delay(500);
-			pos = 0; // reset encoder value to 0
-			break;
-		}
-	}
-
-	enCtrl = true;
-	HAL_Delay(1000);
-
-	return true;
-}
-
-void RateLimiter(int32_t finalTarget) {
+void RateLimiter(uint16_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
 	float remaining = (float)finalTarget - subTarget_f;
 	int32_t position_tolerance = 5;
 	int8_t direction = 0;
 
-	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt)) {
+	if (fabsf(remaining) <= position_tolerance && fabsf(vel) <= (maxAccel * dt_outer)) {
 		subTarget_f = (float)finalTarget;
 		subTarget = finalTarget;
 		vel = 0.0f;
@@ -296,39 +324,50 @@ void RateLimiter(int32_t finalTarget) {
 	}
 
 	float vel_abs = fabsf(vel);
-	float brakingDistance = (vel_abs * vel_abs) / (2.0f * maxAccel);
+	float nextVel = vel_abs + maxAccel * dt_outer;
+	float brakingDistance = (nextVel * nextVel) / (2.0f * maxAccel); // calculating one tick ahead due to sampling time
 
 	if (vel > 0.0f && direction < 0) {
-		vel -= maxAccel * dt;
+		vel -= maxAccel * dt_outer;
 		if (vel < 0.0f) vel = 0.0f;
 	}
 	else if (vel < 0.0f && direction > 0) {
-		vel += maxAccel * dt;
+		vel += maxAccel * dt_outer;
 		if (vel > 0.0f) vel = 0.0f;
 	}
 	else {
 		if (fabsf(remaining) <= brakingDistance) {
 			if (vel_abs > 0.0f) {
 				if (vel > 0.0f) {
-					vel -= maxAccel * dt;
-					if (vel < 0.0f) vel = 0.0f;
+					vel -= maxAccel * dt_outer;
+					if (vel < maxAccel * dt_outer) {
+						subTarget_f = (float)finalTarget;
+						subTarget = finalTarget;
+						vel = 0.0f;
+						return;
+					}
 				}
 				else if (vel < 0.0f) {
-					vel += maxAccel * dt;
-					if (vel > 0.0f) vel = 0.0f;
+					vel += maxAccel * dt_outer;
+					if (vel > -(maxAccel * dt_outer)) {
+						subTarget_f = (float)finalTarget;
+						subTarget = finalTarget;
+						vel = 0.0f;
+						return;
+					}
 				}
 			}
 		}
 		else {
 			if (fabsf(remaining) > position_tolerance) {
-				vel += maxAccel * dt * (float)direction;
+				vel += maxAccel * dt_outer * (float)direction;
 				if (vel > maxVel) vel = maxVel;
 				if (vel < -maxVel) vel = -maxVel;
 			}
 		}
 	}
 
-	subTarget_f += vel * dt;
+	subTarget_f += vel * dt_outer;
 
 	if (direction > 0 && subTarget_f > (float)finalTarget) {
 		subTarget_f = (float)finalTarget;
@@ -339,14 +378,13 @@ void RateLimiter(int32_t finalTarget) {
 		vel = 0.0f;
 	}
 
-	subTarget = (int32_t)subTarget_f;
+	subTarget = (int16_t)subTarget_f;
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	//float INT_MAX = 100.0f / Ki;
 	if (htim == &HTIM_PID) {
 		pos = (int16_t)__HAL_TIM_GET_COUNTER(&HTIM_ENCODER);
-		delta = (int16_t)(pos - prevPos);
+		delta = (float)(pos - prevPos);
 		prevPos = pos;
 
 		if (enCtrl) {
@@ -355,48 +393,58 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			// Integral term = i = dt * (z / (z - 1)) --> step response u[n] at each dt
 			// Derivative term = d = N / (1 + N*dt*(z / (z-1)))
 
-			// input the rate limiter output into the PID controller
-			RateLimiter(target);
+			outerLoopCounter++;
 
-			error_displacement = (subTarget - pos)*countsToRad;
-			prop_displacement = Kp_displacement * error_displacement;
+			// Outer loop: position PD at 1kHz (every 2nd tick)
+			if (outerLoopCounter >= 2) {
+				outerLoopCounter = 0;
 
-			deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt);
+				// input the rate limiter output into the PID controller
+				RateLimiter(target_FSM);
 
-			PD_output = prop_displacement + deriv_displacement;
+				error_displacement = (subTarget - pos) * countsToRad;
+				prop_displacement = Kp_displacement * error_displacement;
 
-			prevError_displacement = error_displacement;
-			prevDeriv_displacement = deriv_displacement;
+				deriv_displacement = (prevDeriv_displacement + Kd_displacement * N * (error_displacement - prevError_displacement)) / (1.0f + N * dt_outer);
 
-			// Integral anti-windup
-			/*
-			if (integral > INT_MAX) {
-				integral = INT_MAX;
+				PD_output = prop_displacement + deriv_displacement;
+
+				prevError_displacement = error_displacement;
+				prevDeriv_displacement = deriv_displacement;
 			}
-			else if (integral < -INT_MAX) {
-				integral = -INT_MAX;
-			}
-			*/
 
-			angularVelocity = (float)(delta/dt)*countsToRad;
+			// Inner loop: velocity PI at 2kHz (every tick)
+			rawVelocity = (float)(delta / dt_inner) * countsToRad;
+
+			if (startupCount < 10) {
+				angularVelocity = 0.0f;
+				startupCount++;
+			} else {
+				angularVelocity = alpha * rawVelocity + (1.0f - alpha) * angularVelocity;
+			}
 			error_velocity = PD_output - angularVelocity;
 
 			prop_velocity = Kp_velocity * error_velocity;
-			integral_velocity += Ki_velocity * error_velocity * dt;
 
-			output = prop_velocity + integral_velocity;
+			float raw_output = prop_velocity + integral_velocity;
 
 			// Clamp output
-			if (output > 100.0f) {
+			if (raw_output > 100.0f) {
 				output = 100.0f;
-			}
-			else if (output < -100.0f) {
+			} else if (raw_output < -100.0f) {
 				output = -100.0f;
+			} else {
+				output = raw_output;
+			}
+
+			// only integrates when output is NOT saturated or when the error would reduce the integral
+			if (fabsf(raw_output) < 100.0f || (error_velocity * integral_velocity) < 0.0f) {
+				integral_velocity += Ki_velocity * error_velocity * dt_inner;
 			}
 
 			// Implement dead-zone (tolerance) to reset derivative and integral terms to 0
 
-			if (abs(target - pos) < 30) {
+			if (labs(target_FSM - pos) < 30 && fabsf(angularVelocity) < 1.0f) {
 				prevError_displacement = 0.0f;
 				//integral = 0.0f;
 				//deriv = 0.0f;
@@ -407,6 +455,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				prop_displacement = 0.0f;
 				integral_velocity = 0.0f;
 				output = 0.0f;
+				if (target_FSM != lastTargetFSM) {
+					lastTargetFSM = target_FSM;
+					done_move = true;
+				}
 				//}
 			} else {
 				// Switch direction depending on output sign
@@ -424,34 +476,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 				}
 			}
 		}
-
 	}
 }
 
 void MotorSetSpeedPercentCh1(float percent) {
     if(percent > 100) percent = 100;
+	if(percent < 0 )  percent = 0;
     uint32_t speed = (percent / 100.0) * 63999;
     __HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_1, speed);
 }
 
 void MotorSetSpeedPercentCh2(float percent) {
 	if(percent > 100) percent = 100;
+	if(percent < 0 )  percent = 0;
 	uint32_t speed = (percent / 100.0) * 63999;
 	__HAL_TIM_SET_COMPARE(&HTIM_MOTOR, TIM_CHANNEL_2, speed);
 }
 
-/*
-void SolenoidPress(int pressTime_ms) {
-	uint32_t startTime = HAL_GetTick();
-	solenoidOn = true;
-
-	HAL_GPIO_WritePin(SOLENOID_1_PORT, SOLENOID_1_PIN, GPIO_PIN_SET);
-
-	if (HAL_GetTick() - startTime > pressTime_ms) {
-		HAL_GPIO_WritePin(SOLENOID_1_PORT, SOLENOID_1_PIN, GPIO_PIN_RESET);
-	}
+int _write(int file, char *ptr, int len)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t*)ptr, len, HAL_MAX_DELAY);
+    return len;
 }
-*/
 /* USER CODE END 4 */
 
 /**
