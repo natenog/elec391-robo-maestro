@@ -57,8 +57,9 @@ typedef struct {
 } NoteMapping;
 
 typedef struct {
-    float key_mm;         // which key (use KEY_C4, KEY_FS4, etc.)
-    uint16_t time_ms;     // when to play from song start
+    float key_mm;
+    uint16_t time_ms;
+    uint8_t solenoid;
 } SongEntry;
 
 // ============ STATE VARIABLES ============
@@ -78,17 +79,17 @@ NoteMapping currentNote;
 // ============ SONG DATA ============
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-    {KEY_C4,   0},
-    {KEY_E4,   1000},
-    {KEY_G4,   2000},
-    {KEY_AS4,  3000},
-    {KEY_C5,   4000},
-    {KEY_AS4,  5000},
-    {KEY_G4,   6000},
-    {KEY_FS4,  7000},
-    {KEY_E4,   8000},
-    {KEY_DS4,  9000},
-    {KEY_C4,   10000},
+    {KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
+    {KEY_E4,   1000,  SOL_WREF},   // Step 2:  E4  at P0
+    {KEY_G4,   2000,  SOL_WREF},   // Step 3:  G4  at P1
+    {KEY_AS4,  3000,  SOL_B2},     // Step 4:  Bb4 at P2
+    {KEY_C5,   4000,  SOL_W2},     // Step 5:  C5  at P2
+    {KEY_AS4,  5000,  SOL_B2},     // Step 6:  Bb4 at P2
+    {KEY_G4,   6000,  SOL_WREF},   // Step 7:  G4  at P1
+    {KEY_FS4,  7000,  SOL_B1},     // Step 8:  F#4 at P1
+    {KEY_E4,   8000,  SOL_WREF},   // Step 9:  E4  at P0
+    {KEY_DS4,  9000,  SOL_B1},     // Step 10: D#4 at P0
+    {KEY_C4,   10000, SOL_W1},     // Step 11: C4  at P0
 };
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
@@ -192,31 +193,37 @@ void FSM(void) {
         break;
 
     case MOVE:
-        // Map the current note to find motor target and solenoid
-        currentNote = MapNote(song[song_index].key_mm);
-        target_FSM = currentNote.motorTarget;
+    {
+        float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
+        float keyPos = song[song_index].key_mm;
+        float wrefPos = keyPos - offsets[song[song_index].solenoid];
+        target_FSM = (int32_t)(wrefPos * MM_TO_COUNTS);
 
         if (done_move) {
             done_move = false;
             state = PLAY;
         }
         break;
+    }
 
     case PLAY:
         if (solenoidActive) {
             break;
         }
         if (now - song_start_time >= song[song_index].time_ms) {
-            FireSolenoid(currentNote.solenoid);
+            FireSolenoid(song[song_index].solenoid);
             song_index++;
 
             if (song_index >= numNotes) {
                 state = DONE;
             }
             else {
-                NoteMapping nextNote = MapNote(song[song_index].key_mm);
-                if (nextNote.motorTarget == currentNote.motorTarget) {
-                    currentNote = nextNote;
+                // Same position if next note's motor target matches current
+                float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
+                float nextWref = song[song_index].key_mm - offsets[song[song_index].solenoid];
+                int32_t nextTarget = (int32_t)(nextWref * MM_TO_COUNTS);
+
+                if (nextTarget == target_FSM) {
                     state = PLAY;
                 }
                 else {
