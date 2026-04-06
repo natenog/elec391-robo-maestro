@@ -74,6 +74,7 @@ bool limit_switch = false;
 //bool done_move = false;
 bool reset = false;
 bool enCtrl = false;
+bool waitInitialized = false; 
 
 volatile bool solenoidActive = false;
 uint32_t solenoidOffTime = 0;
@@ -181,22 +182,26 @@ void FSM(void) {
 
     switch (state) {
     case HOME:
-        // Wait for limit switch to be pressed to start homing
         StopAllSolenoids();
+        waitInitialized = false;
         Home();
         if (homed) {
             limit_switch_pressed = now;
             state = WAIT;
         }
         break;
-
+        
     case WAIT:
-        __HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
-        target_FSM = (int32_t)(HOME_TO_C4 * MM_TO_COUNTS);  // move to C4 first
+        if (!waitInitialized) {
+            __HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
+            target_FSM = (int32_t)(HOME_TO_C4 * MM_TO_COUNTS);
+            enCtrl = true;
+            waitInitialized = true;
+        }
         if (done_move && (now - limit_switch_pressed >= 2000)) {
             song_index = 0;
             song_start_time = now;
-            enCtrl = true;
+            done_move = false;
             state = MOVE;
         }
         break;
