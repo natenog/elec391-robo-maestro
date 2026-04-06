@@ -170,7 +170,20 @@ int main(void)
 	  uint32_t now = HAL_GetTick();
 
 	  if (now - lastPrint >= 100) { // every 100 ms
-		  lastPrint = HAL_GetTick();
+	  	  lastPrint = HAL_GetTick();
+		  __disable_irq();
+		  int16_t pos_copy = pos;
+		  int32_t sub_copy = subTarget;
+		  float prop_copy = prop_displacement;
+		  float int_copy = integral_displacement;
+		  float deriv_copy = deriv_displacement;
+		  float vel_copy = angularVelocity;
+		  float out_copy = output;
+		  __enable_irq();
+
+		  printf("%ld,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
+			  (double)prop_copy, (double)int_copy, (double)deriv_copy,
+			  (double)vel_copy, (double)out_copy);
 		  /*
 		  switch (state) {
 		      case HOME:
@@ -204,7 +217,6 @@ int main(void)
 		  */
 
 		  //if (now < 15000) {
-		  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
 		  //}
 
 		  /*
