@@ -80,6 +80,7 @@ NoteMapping currentNote;
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
     //{KEY_C4,   0},
+		/*
     {KEY_E4,   1000},
     {KEY_G4,   2000},
     {KEY_AS4,  3000},
@@ -90,6 +91,8 @@ static SongEntry song[] = {
     {KEY_E4,   8000},
     {KEY_DS4,  9000},
     {KEY_C4,   10000},
+    */
+		{KEY_F4, 1000}
 };
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 

@@ -21,7 +21,6 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "fsm.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -30,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "fsm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,7 +50,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-float Kp_displacement = 4.5f;
+//float Kp_displacement = 4.5f;
+float Kp_displacement = 20.0f;
 float Ki_displacement = 1.2f;
 float Kd_displacement = 0.3f;
 float Kp_velocity = 0.6f;
@@ -61,8 +62,8 @@ const float dt_outer = 0.001f;    // 1kHz
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
-float maxVel = 10000.0f;
-float maxAccel = 15000.0f;
+float maxVel = 40000.0f;
+float maxAccel = 75000.0f;
 float alpha = 0.05;
 
 volatile int16_t pos = 0;
@@ -87,7 +88,6 @@ volatile float angularDisplacement = 0.0f;
 volatile float angularVelocity = 0.0f;
 volatile float rawVelocity = 0.0f;
 
-int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
@@ -184,7 +184,7 @@ int main(void)
 		  printf("%ld,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
 			  (double)prop_copy, (double)int_copy, (double)deriv_copy,
 			  (double)vel_copy, (double)out_copy);
-		  /*
+	  	  /*
 		  switch (state) {
 		      case HOME:
 		          printf("FSM State: HOME\n");
@@ -215,6 +215,11 @@ int main(void)
 			  printf("Time: %ld, Done moving! Start playing.\r\n", now);
 		  }
 		  */
+	  	  /*
+	  	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
+	  		  printf("Test\r\n");
+	  	  }
+	  	  */
 
 		  //if (now < 15000) {
 		  //}

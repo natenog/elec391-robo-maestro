@@ -8,6 +8,7 @@
 
 #include "main.h"
 #include "fsm.h"
+#include "tim.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -63,13 +64,14 @@ typedef struct {
 } SongEntry;
 
 // ============ STATE VARIABLES ============
-FSM_State state = MOVE;
+FSM_State state = HOME;
 uint8_t song_index = 0;
 uint16_t limit_switch_pressed = 0;
 uint16_t target_FSM = 0;
 bool limit_switch = false;
 //bool done_move = false;
 bool reset = false;
+bool enCtrl = false;
 
 volatile bool solenoidActive = false;
 uint32_t solenoidOffTime = 0;
@@ -79,9 +81,10 @@ NoteMapping currentNote;
 // ============ SONG DATA ============
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-    {KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
-    {KEY_E4,   1000,  SOL_WREF},   // Step 2:  E4  at P0
-    {KEY_G4,   2000,  SOL_WREF},   // Step 3:  G4  at P1
+    //{KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
+    {KEY_F4,   1000,  SOL_WREF},   // Step 2:  E4  at P0
+    {KEY_G4,   1100,  SOL_WREF},   // Step 3:  G4  at P1
+	/*
     {KEY_AS4,  3000,  SOL_B2},     // Step 4:  Bb4 at P2
     {KEY_C5,   4000,  SOL_W2},     // Step 5:  C5  at P2
     {KEY_AS4,  5000,  SOL_B2},     // Step 6:  Bb4 at P2
@@ -90,6 +93,7 @@ static SongEntry song[] = {
     {KEY_E4,   8000,  SOL_WREF},   // Step 9:  E4  at P0
     {KEY_DS4,  9000,  SOL_B1},     // Step 10: D#4 at P0
     {KEY_C4,   10000, SOL_W1},     // Step 11: C4  at P0
+    */
 };
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
@@ -177,7 +181,8 @@ void FSM(void) {
     case HOME:
         // Wait for limit switch to be pressed to start homing
         StopAllSolenoids();
-        if (limit_switch) {
+        Home();
+        if (homed) {
             limit_switch_pressed = now;
             state = WAIT;
         }
@@ -185,9 +190,11 @@ void FSM(void) {
 
     case WAIT:
         // After the limit switch is pressed, wait 2 seconds before starting the song
+    	__HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
         if (now - limit_switch_pressed >= 2000) {
             song_index = 0;
             song_start_time = now;
+            enCtrl = true;
             state = MOVE;
         }
         break;
