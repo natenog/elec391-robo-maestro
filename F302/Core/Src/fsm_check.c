@@ -8,6 +8,7 @@
 
 #include "main.h"
 #include "fsm.h"
+#include "tim.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -62,13 +63,13 @@ typedef struct {
 } SongEntry;
 
 // ============ STATE VARIABLES ============
-FSM_State state = MOVE;
+FSM_State state = HOME;
 uint8_t song_index = 0;
 uint16_t limit_switch_pressed = 0;
 uint16_t target_FSM = 0;
-bool limit_switch = false;
 //bool done_move = false;
 bool reset = false;
+bool enCtrl = false;
 
 volatile bool solenoidActive = false;
 uint32_t solenoidOffTime = 0;
@@ -78,14 +79,17 @@ NoteMapping currentNote;
 // ============ SONG DATA ============
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-	//{KEY_C4,	0},
-	{KEY_D4,	2000},
-	{KEY_E4,	4000},
-	{KEY_F4,	6000},
-	{KEY_G4,	8000},
-	{KEY_A4,	10000},
-	{KEY_B4,	12000},
-	{KEY_C5,	14000},
+    //{KEY_C4,   0},
+    {KEY_E4,   1000},
+    {KEY_G4,   2000},
+    {KEY_AS4,  3000},
+    {KEY_C5,   4000},
+    {KEY_AS4,  5000},
+    {KEY_G4,   6000},
+    {KEY_FS4,  7000},
+    {KEY_E4,   8000},
+    {KEY_DS4,  9000},
+    {KEY_C4,   10000},
 };
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
@@ -111,7 +115,7 @@ NoteMapping MapNote(float keyPosition_mm) {
     for (int i = 0; i < 5; i++) {
         float wrefPos = keyPosition_mm - offsets[i];
 
-        float dist = fabsf(wrefPos * MM_TO_COUNTS - subTarget_f);
+        float dist = fabsf(wrefPos * MM_TO_COUNTS - (float)target_FSM);
         if (dist < bestDist) {
             bestDist = dist;
             best = i;
@@ -173,7 +177,8 @@ void FSM(void) {
     case HOME:
         // Wait for limit switch to be pressed to start homing
         StopAllSolenoids();
-        if (limit_switch) {
+        Home();
+        if (homed) {
             limit_switch_pressed = now;
             state = WAIT;
         }
@@ -181,22 +186,20 @@ void FSM(void) {
 
     case WAIT:
         // After the limit switch is pressed, wait 2 seconds before starting the song
+    	__HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
         if (now - limit_switch_pressed >= 2000) {
             song_index = 0;
             song_start_time = now;
+            enCtrl = true;
             state = MOVE;
         }
         break;
 
     case MOVE:
         // Map the current note to find motor target and solenoid
-        //currentNote = MapNote(song[song_index].key_mm);
-        //target_FSM = currentNote.motorTarget;
-    	float keyPosition_mm = song[song_index].key_mm;
-    	float wrefPos = keyPosition_mm - OFFSET_WREF;
-    	target_FSM = (uint16_t)(wrefPos * MM_TO_COUNTS);
+        currentNote = MapNote(song[song_index].key_mm);
+        target_FSM = currentNote.motorTarget;
 
-        // done_move is set from PID controller when motor has stopped inside the deadzone
         if (done_move) {
             done_move = false;
             state = PLAY;
@@ -204,30 +207,27 @@ void FSM(void) {
         break;
 
     case PLAY:
-        // Wait until it's time to play this note
         if (solenoidActive) {
             break;
         }
         if (now - song_start_time >= song[song_index].time_ms) {
-            //FireSolenoid(currentNote.solenoid);
-        	FireSolenoid(SOL_W1);
+            FireSolenoid(currentNote.solenoid);
             song_index++;
 
             if (song_index >= numNotes) {
                 state = DONE;
             }
             else {
-                // Check if next note can be played from same position (no move needed)
                 NoteMapping nextNote = MapNote(song[song_index].key_mm);
                 if (nextNote.motorTarget == currentNote.motorTarget) {
                     currentNote = nextNote;
-                    state = PLAY; // stay here, just fire a different solenoid next time
+                    state = PLAY;
                 }
                 else {
-                		state = MOVE; // need to move carriage to new position
-                	}
+                    state = MOVE;
                 }
             }
+        }
         break;
 
     case DONE:

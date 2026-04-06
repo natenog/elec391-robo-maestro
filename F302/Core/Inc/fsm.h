@@ -33,6 +33,7 @@ typedef struct {
 extern FSM_State state;
 extern uint16_t target_FSM;
 extern float keyPosition_mm;
+extern bool enCtrl;
 
 #define SOLENOID_PORT GPIOB
 #define SOLENOID_1_PIN GPIO_PIN_5

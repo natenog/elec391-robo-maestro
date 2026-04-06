@@ -21,7 +21,6 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "fsm.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -30,6 +29,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include "fsm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -91,10 +91,11 @@ int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
-bool enCtrl = true;
 bool done_move = false;
 volatile uint8_t outerLoopCounter = 0;
 static uint8_t startupCount = 0;
+
+bool homed = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -140,10 +141,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM15_Init();
   MX_USART2_UART_Init();
-  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Encoder_Start(&HTIM_ENCODER, TIM_CHANNEL_ALL);
   HAL_TIM_Base_Start_IT(&HTIM_PID);
@@ -169,7 +170,20 @@ int main(void)
 	  uint32_t now = HAL_GetTick();
 
 	  if (now - lastPrint >= 100) { // every 100 ms
-		  lastPrint = HAL_GetTick();
+	  	  lastPrint = HAL_GetTick();
+		  __disable_irq();
+		  int16_t pos_copy = pos;
+		  int32_t sub_copy = subTarget;
+		  float prop_copy = prop_displacement;
+		  float int_copy = integral_displacement;
+		  float deriv_copy = deriv_displacement;
+		  float vel_copy = angularVelocity;
+		  float out_copy = output;
+		  __enable_irq();
+
+		  printf("%ld,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
+			  (double)prop_copy, (double)int_copy, (double)deriv_copy,
+			  (double)vel_copy, (double)out_copy);
 		  /*
 		  switch (state) {
 		      case HOME:
@@ -202,9 +216,8 @@ int main(void)
 		  }
 		  */
 
-		  if (now < 18000) {
-			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
-		  }
+		  //if (now < 15000) {
+		  //}
 
 		  /*
 		  if (done_move == false) {
@@ -214,39 +227,9 @@ int main(void)
 			  printf("Done moving! Start playing.\r\n");
 		  }
 		  */
-		  //printf("%d\r\n", pos);
-		  //if (now < 10000) {
-		  /*
-		  __disable_irq();
-		  int16_t pos_copy = pos;
-		  int32_t sub_copy = subTarget;
-		  float prop_copy = prop_displacement;
-		  float int_copy = integral_displacement;
-		  float deriv_copy = deriv_displacement;
-		  float vel_copy = angularVelocity;
-		  float out_copy = output;
-		  __enable_irq();
-
-		  printf("%lu,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
-			(double)prop_copy, (double)int_copy, (double)deriv_copy,
-			(double)vel_copy, (double)out_copy);
-		  //}		   */
 	  }
 	  //SolenoidUpdate();
-	  /*
-	  if (now >= 2000) {
-		  target = 300;
-	  }
-
-	  if (now >= 4000) {
-		  target = 1000;
-	  }
-
-	  if (now >= 6000) {
-		  target = 3000;
-	  }
-	  */
-	  FSM();
+	 FSM();
 
   }
   /* USER CODE END 3 */
@@ -268,9 +251,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -280,12 +261,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -299,6 +280,18 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void Home(void) {
+	if (homed == false) {
+		MotorSetSpeedPercentCh1(0);
+		MotorSetSpeedPercentCh2(0.1);
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
+			MotorSetSpeedPercentCh1(0);
+			MotorSetSpeedPercentCh2(0);
+			homed = true;
+		}
+	}
+}
+
 void RateLimiter(uint16_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 

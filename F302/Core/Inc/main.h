@@ -28,17 +28,17 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f3xx_hal.h"
-#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdbool.h>
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 extern float subTarget_f;
 extern bool done_move;
+extern bool homed;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -55,7 +55,7 @@ extern bool done_move;
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void Home(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
