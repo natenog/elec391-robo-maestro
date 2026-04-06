@@ -91,10 +91,11 @@ int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
-bool enCtrl = true;
 bool done_move = false;
 volatile uint8_t outerLoopCounter = 0;
 static uint8_t startupCount = 0;
+
+bool homed = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -202,9 +203,9 @@ int main(void)
 		  }
 		  */
 
-		  if (now < 18000) {
-			  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
-		  }
+		  //if (now < 15000) {
+		  printf("%ld,%d,%ld,%lf,%lf,%lf,%lf,%lf\r\n", now, pos, subTarget, prop_displacement, integral_displacement, deriv_displacement, angularVelocity, output);
+		  //}
 
 		  /*
 		  if (done_move == false) {
@@ -214,39 +215,9 @@ int main(void)
 			  printf("Done moving! Start playing.\r\n");
 		  }
 		  */
-		  //printf("%d\r\n", pos);
-		  //if (now < 10000) {
-		  /*
-		  __disable_irq();
-		  int16_t pos_copy = pos;
-		  int32_t sub_copy = subTarget;
-		  float prop_copy = prop_displacement;
-		  float int_copy = integral_displacement;
-		  float deriv_copy = deriv_displacement;
-		  float vel_copy = angularVelocity;
-		  float out_copy = output;
-		  __enable_irq();
-
-		  printf("%lu,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
-			(double)prop_copy, (double)int_copy, (double)deriv_copy,
-			(double)vel_copy, (double)out_copy);
-		  //}		   */
 	  }
 	  //SolenoidUpdate();
-	  /*
-	  if (now >= 2000) {
-		  target = 300;
-	  }
-
-	  if (now >= 4000) {
-		  target = 1000;
-	  }
-
-	  if (now >= 6000) {
-		  target = 3000;
-	  }
-	  */
-	  FSM();
+	 FSM();
 
   }
   /* USER CODE END 3 */
@@ -299,6 +270,18 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void Home(void) {
+	if (homed == false) {
+		MotorSetSpeedPercentCh1(0);
+		MotorSetSpeedPercentCh2(0.1);
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
+			MotorSetSpeedPercentCh1(0);
+			MotorSetSpeedPercentCh2(0);
+			homed = true;
+		}
+	}
+}
+
 void RateLimiter(uint16_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
