@@ -28,19 +28,21 @@
 #define MM_TO_COUNTS (2797.0f / (2.0f * 12.5f * M_PI))
 
 // Piano key positions in mm from C4 (home)
-#define KEY_C4   0.0f
-#define KEY_CS4  14.0f
-#define KEY_D4   21.5f
-#define KEY_DS4  37.5f
-#define KEY_E4   43.0f
-#define KEY_F4   64.5f
-#define KEY_FS4  84.0f
-#define KEY_G4   86.0f
-#define KEY_GS4  107.5f
-#define KEY_A4   107.5f
-#define KEY_AS4  131.0f
-#define KEY_B4   129.0f
-#define KEY_C5   150.5f
+#define HOME_TO_C4  280.0f  // measure this on your actual piano
+
+#define KEY_C4   (HOME_TO_C4 + 0.0f)
+#define KEY_CS4  (HOME_TO_C4 + 14.0f)
+#define KEY_D4   (HOME_TO_C4 + 21.5f)
+#define KEY_DS4  (HOME_TO_C4 + 37.5f)
+#define KEY_E4   (HOME_TO_C4 + 43.0f)
+#define KEY_F4   (HOME_TO_C4 + 64.5f)
+#define KEY_FS4  (HOME_TO_C4 + 84.0f)
+#define KEY_G4   (HOME_TO_C4 + 86.0f)
+#define KEY_GS4  (HOME_TO_C4 + 107.5f)
+#define KEY_A4   (HOME_TO_C4 + 107.5f)
+#define KEY_AS4  (HOME_TO_C4 + 131.0f)
+#define KEY_B4   (HOME_TO_C4 + 129.0f)
+#define KEY_C5   (HOME_TO_C4 + 150.5f)
 
 // Solenoid offsets from W_ref in mm
 #define OFFSET_W1    -45.0f
@@ -189,9 +191,9 @@ void FSM(void) {
         break;
 
     case WAIT:
-        // After the limit switch is pressed, wait 2 seconds before starting the song
-    	__HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
-        if (now - limit_switch_pressed >= 2000) {
+        __HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
+        target_FSM = (int32_t)(HOME_TO_C4 * MM_TO_COUNTS);  // move to C4 first
+        if (done_move && (now - limit_switch_pressed >= 2000)) {
             song_index = 0;
             song_start_time = now;
             enCtrl = true;
