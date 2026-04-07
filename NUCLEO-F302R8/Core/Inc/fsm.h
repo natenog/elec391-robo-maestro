@@ -31,7 +31,7 @@ typedef struct {
 } Solenoids;
 
 extern FSM_State state;
-extern uint16_t target_FSM;
+extern int32_t target_FSM;
 extern float keyPosition_mm;
 extern bool enCtrl;
 

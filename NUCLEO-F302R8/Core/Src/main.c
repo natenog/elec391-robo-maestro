@@ -101,7 +101,7 @@ bool homed = false;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void RateLimiter(uint16_t finalTarget);
+void RateLimiter(int32_t finalTarget);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorSetSpeedPercentCh1(float percent);
 void MotorSetSpeedPercentCh2(float percent);
@@ -290,7 +290,7 @@ void SystemClock_Config(void)
 void Home(void) {
 	if (homed == false) {
 		MotorSetSpeedPercentCh1(0);
-		MotorSetSpeedPercentCh2(0.1);
+		MotorSetSpeedPercentCh2(0.05);
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
 			MotorSetSpeedPercentCh1(0);
 			MotorSetSpeedPercentCh2(0);
@@ -299,7 +299,7 @@ void Home(void) {
 	}
 }
 
-void RateLimiter(uint16_t finalTarget) {
+void RateLimiter(int32_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
 	float remaining = (float)finalTarget - subTarget_f;

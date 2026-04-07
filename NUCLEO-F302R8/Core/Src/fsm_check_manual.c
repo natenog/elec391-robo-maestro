@@ -97,7 +97,6 @@ static SongEntry song[] = {
     {KEY_E4,   8500,  SOL_WREF},   // Step 9:  E4  at P0
     {KEY_DS4,  9500,  SOL_B1},     // Step 10: D#4 at P0
     {KEY_C4,   10500, SOL_W1},     // Step 11: C4  at P0
-
 };
 
 // ============ THOMAS THE TANK ENGINE THEME SONG ===============
@@ -214,13 +213,13 @@ void FireSolenoid(uint8_t solenoid) {
     case SOL_W1:
         HAL_GPIO_WritePin(SOLENOID_PORT, SOLENOID_1_PIN, GPIO_PIN_SET);
         break;
-    case SOL_WREF:
+    case SOL_B1:
         HAL_GPIO_WritePin(SOLENOID_PORT, SOLENOID_2_PIN, GPIO_PIN_SET);
         break;
-    case SOL_W2:
+    case SOL_WREF:
         HAL_GPIO_WritePin(SOLENOID_PORT, SOLENOID_3_PIN, GPIO_PIN_SET);
         break;
-    case SOL_B1:
+    case SOL_W2:
         HAL_GPIO_WritePin(SOLENOID_PORT, SOLENOID_4_PIN, GPIO_PIN_SET);
         break;
     case SOL_B2:
