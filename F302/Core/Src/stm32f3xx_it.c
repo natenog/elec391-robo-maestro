@@ -199,5 +199,10 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /* USER CODE BEGIN 1 */
+extern TIM_HandleTypeDef htim2;
 
+void TIM2_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&htim2);
+}
 /* USER CODE END 1 */
