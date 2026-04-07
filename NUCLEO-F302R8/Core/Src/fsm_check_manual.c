@@ -27,6 +27,7 @@
 // Calibrate this to your pulley: counts_per_rev / (diameter_mm * PI)
 //#define MM_TO_COUNTS (2797.0f / (2.0f * 11.75f * M_PI))
 #define MM_TO_COUNTS 33.65f
+#define HOME_TO_C4 6655.0f
 
 // Piano key positions in mm from C4 (home)
 #define KEY_C4   0.0f
@@ -69,7 +70,7 @@ typedef struct {
 FSM_State state = HOME;
 uint8_t song_index = 0;
 uint16_t limit_switch_pressed = 0;
-uint16_t target_FSM = 0;
+int32_t target_FSM = 0;
 bool limit_switch = false;
 //bool done_move = false;
 bool reset = false;
@@ -278,7 +279,7 @@ void FSM(void) {
         float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
         float keyPos = song[song_index].key_mm;
         float wrefPos = keyPos - offsets[song[song_index].solenoid];
-        target_FSM = (int32_t)(wrefPos * MM_TO_COUNTS);
+        target_FSM = (int32_t)((wrefPos * MM_TO_COUNTS)+HOME_TO_C4);
 
         if (done_move) {
             done_move = false;
@@ -305,7 +306,7 @@ void FSM(void) {
                 // Same position if next note's motor target matches current
                 float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
                 float nextWref = song[song_index].key_mm - offsets[song[song_index].solenoid];
-                int32_t nextTarget = (int32_t)(nextWref * MM_TO_COUNTS);
+                int32_t nextTarget = (int32_t)((nextWref * MM_TO_COUNTS)+HOME_TO_C4);
 
                 if (nextTarget == target_FSM) {
                     state = PLAY;
