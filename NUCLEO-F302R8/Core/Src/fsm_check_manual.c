@@ -25,24 +25,24 @@
 
 // ============ PHYSICAL MAPPING ============
 // Calibrate this to your pulley: counts_per_rev / (diameter_mm * PI)
-#define MM_TO_COUNTS (2797.0f / (2.0f * 12.5f * M_PI))
+//#define MM_TO_COUNTS (2797.0f / (2.0f * 11.75f * M_PI))
+#define MM_TO_COUNTS 33.65f
 
 // Piano key positions in mm from C4 (home)
-#define HOME_TO_C4  280.0f  // measure this on your actual piano
-
-#define KEY_C4   (HOME_TO_C4 + 0.0f)
-#define KEY_CS4  (HOME_TO_C4 + 14.0f)
-#define KEY_D4   (HOME_TO_C4 + 21.5f)
-#define KEY_DS4  (HOME_TO_C4 + 37.5f)
-#define KEY_E4   (HOME_TO_C4 + 43.0f)
-#define KEY_F4   (HOME_TO_C4 + 64.5f)
-#define KEY_FS4  (HOME_TO_C4 + 84.0f)
-#define KEY_G4   (HOME_TO_C4 + 86.0f)
-#define KEY_GS4  (HOME_TO_C4 + 107.5f)
-#define KEY_A4   (HOME_TO_C4 + 107.5f)
-#define KEY_AS4  (HOME_TO_C4 + 131.0f)
-#define KEY_B4   (HOME_TO_C4 + 129.0f)
-#define KEY_C5   (HOME_TO_C4 + 150.5f)
+#define KEY_C4   0.0f
+#define KEY_CS4  14.0f
+#define KEY_D4   21.5f
+#define KEY_DS4  37.5f
+#define KEY_E4   43.0f
+#define KEY_F4   64.5f
+#define KEY_FS4  84.0f
+#define KEY_G4   86.0f
+#define KEY_GS4  107.5f
+#define KEY_A4   107.5f
+#define KEY_AS4  131.0f
+#define KEY_B4   129.0f
+#define KEY_C5   150.5f
+#define KEY_C6	 280.0f
 
 // Solenoid offsets from W_ref in mm
 #define OFFSET_W1    -45.0f
@@ -74,7 +74,6 @@ bool limit_switch = false;
 //bool done_move = false;
 bool reset = false;
 bool enCtrl = false;
-bool waitInitialized = false; 
 
 volatile bool solenoidActive = false;
 uint32_t solenoidOffTime = 0;
@@ -84,20 +83,92 @@ NoteMapping currentNote;
 // ============ SONG DATA ============
 // list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-    //{KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
-    {KEY_F4,   1000,  SOL_WREF},   // Step 2:  E4  at P0
-    {KEY_G4,   1100,  SOL_WREF},   // Step 3:  G4  at P1
-	/*
-    {KEY_AS4,  3000,  SOL_B2},     // Step 4:  Bb4 at P2
-    {KEY_C5,   4000,  SOL_W2},     // Step 5:  C5  at P2
-    {KEY_AS4,  5000,  SOL_B2},     // Step 6:  Bb4 at P2
-    {KEY_G4,   6000,  SOL_WREF},   // Step 7:  G4  at P1
-    {KEY_FS4,  7000,  SOL_B1},     // Step 8:  F#4 at P1
-    {KEY_E4,   8000,  SOL_WREF},   // Step 9:  E4  at P0
-    {KEY_DS4,  9000,  SOL_B1},     // Step 10: D#4 at P0
-    {KEY_C4,   10000, SOL_W1},     // Step 11: C4  at P0
-    */
+	//{KEY_E4,  1500},        // placeholder — replace with your song
+	//{KEY_G4,  4000},     // placeholder
+    {KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
+    {KEY_D4,   1500,  SOL_WREF},   // Step 2:  E4  at P0
+    {KEY_G4,   2500,  SOL_WREF},   // Step 3:  G4  at P1
+    {KEY_AS4,  3500,  SOL_B2},     // Step 4:  Bb4 at P2
+    {KEY_C5,   4500,  SOL_W2},     // Step 5:  C5  at P2
+    {KEY_AS4,  5500,  SOL_B2},     // Step 6:  Bb4 at P2
+    {KEY_G4,   6500,  SOL_WREF},   // Step 7:  G4  at P1
+    {KEY_FS4,  7500,  SOL_B1},     // Step 8:  F#4 at P1
+    {KEY_E4,   8500,  SOL_WREF},   // Step 9:  E4  at P0
+    {KEY_DS4,  9500,  SOL_B1},     // Step 10: D#4 at P0
+    {KEY_C4,   10500, SOL_W1},     // Step 11: C4  at P0
+
 };
+
+// ============ THOMAS THE TANK ENGINE THEME SONG ===============
+
+/*static SongEntry song[] = {
+	// CHORUS
+	{KEY_G4, 0, SOL_WREF},
+	{KEY_A4, 250, SOL_WREF},
+	{KEY_B4, 500, SOL_WREF},
+	{KEY_C5, 750, SOL_WREF},
+	{KEY_D5, 1250, SOL_WREF},
+	{KEY_E5, 1500, SOL_WREF},
+	{KEY_GS4, 2000, SOL_B1},
+
+	{KEY_A4, 4000, SOL_W2},
+	{KEY_F4, 4250, SOL_WREF},
+	{KEY_A4, 4500, SOL_W2},
+	{KEY_G4, 4750, SOL_WREF},
+
+	{KEY_GS4, 5875, SOL_B1},
+	{KEY_A4, 6000, SOL_WREF},
+	{KEY_F4, 6250, SOL_W1},
+	{KEY_F4, 6500, SOL_W1},
+	{KEY_A4, 6750, SOL_WREF},
+	{KEY_G4, 6875, SOL_WREF},
+
+	{KEY_FS4, 7375, SOL_B1},
+	{KEY_G4, 7500, SOL_WREF},
+	{KEY_FS4, 7625, SOL_B1},
+	{KEY_G4, 7750, SOL_WREF},
+	{KEY_FS4, 7875, SOL_B1},
+	{KEY_G4, 8000, SOL_WREF},
+	{KEY_G4, 8500, SOL_WREF},
+
+	{KEY_FS4, 9375, SOL_B1},
+	{KEY_G4, 9500, SOL_WREF},
+	{KEY_FS4, 9625, SOL_B1},
+	{KEY_G4, 9750, SOL_WREF},
+	{KEY_GS4, 10000, SOL_B2},
+	{KEY_GS4, 10500, SOL_B2},
+
+	{KEY_DS4, 11125, SOL_B1},
+	{KEY_F4, 11500, SOL_WREF},
+	{KEY_FS4, 11750, SOL_B2},
+	{KEY_G4, 12000, SOL_WREF},
+	{KEY_AS4, 12500, SOL_B2},
+	{KEY_F4, 13000, SOL_W1},
+	{KEY_G4, 13500, SOL_W1},
+	{KEY_GS4, 14000, SOL_B1},
+
+	// VERSE
+	{KEY_GS3, 15250, SOL_B2},
+	{KEY_G3, 15500, SOL_WREF},
+	{KEY_FS3, 15750, SOL_B2},
+	{KEY_F3, 16000, SOL_WREF},
+	{KEY_F3, 16250, SOL_WREF},
+	{KEY_AS3, 16500, SOL_B2},
+	{KEY_AS3, 16750, SOL_B2},
+	{KEY_CS4, 17000, SOL_B2},
+	{KEY_CS4, 17125, SOL_B2},
+	{KEY_F4, 17375, SOL_W2},
+
+	{KEY_DS3, 18063, SOL_B1},
+	{KEY_DS3, 18313, SOL_B1},
+	{KEY_GS3, 18438, SOL_B2},
+	{KEY_GS3, 18688, SOL_B2},
+	{KEY_C4, 18938, SOL_WREF},
+	{KEY_
+	}
+};
+*/
+
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
 // ============ FUNCTION PROTOTYPES ============
@@ -182,26 +253,22 @@ void FSM(void) {
 
     switch (state) {
     case HOME:
+        // Wait for limit switch to be pressed to start homing
         StopAllSolenoids();
-        waitInitialized = false;
         Home();
         if (homed) {
             limit_switch_pressed = now;
             state = WAIT;
         }
         break;
-        
+
     case WAIT:
-        if (!waitInitialized) {
-            __HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
-            target_FSM = (int32_t)(HOME_TO_C4 * MM_TO_COUNTS);
-            enCtrl = true;
-            waitInitialized = true;
-        }
-        if (done_move && (now - limit_switch_pressed >= 2000)) {
+        // After the limit switch is pressed, wait 2 seconds before starting the song
+    	__HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
+        if (now - limit_switch_pressed >= 2000) {
             song_index = 0;
             song_start_time = now;
-            done_move = false;
+            enCtrl = true;
             state = MOVE;
         }
         break;
@@ -215,6 +282,8 @@ void FSM(void) {
 
         if (done_move) {
             done_move = false;
+            FireSolenoid(song[song_index].solenoid);
+            song_index++;
             state = PLAY;
         }
         break;
@@ -225,8 +294,9 @@ void FSM(void) {
             break;
         }
         if (now - song_start_time >= song[song_index].time_ms) {
-            FireSolenoid(song[song_index].solenoid);
-            song_index++;
+            //FireSolenoid(song[song_index].solenoid);
+        	//FireSolenoid(SOL_W1);
+        	//song_index++;
 
             if (song_index >= numNotes) {
                 state = DONE;
@@ -241,7 +311,7 @@ void FSM(void) {
                     state = PLAY;
                 }
                 else {
-                    state = MOVE;
+                	state = MOVE;
                 }
             }
         }
