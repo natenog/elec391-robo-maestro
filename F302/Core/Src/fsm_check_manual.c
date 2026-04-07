@@ -83,47 +83,17 @@ uint32_t song_start_time = 0;
 NoteMapping currentNote;
 
 // ============ SONG DATA ============
-// Ode to Joy - Beethoven (100 BPM, quarter note = 600ms)
-// All white keys C4-G4, using WREF solenoid
+// TEST: Simple scale, no repeated positions, 1 second per note
 static SongEntry song[] = {
-    // Bar 1: E E F G
-    {KEY_E4,   0,     SOL_WREF},
-    {KEY_E4,   600,   SOL_WREF},
-    {KEY_F4,   1200,  SOL_WREF},
-    {KEY_G4,   1800,  SOL_WREF},
-    // Bar 2: G F E D
-    {KEY_G4,   2400,  SOL_WREF},
+    {KEY_C4,   0,     SOL_WREF},
+    {KEY_D4,   1000,  SOL_WREF},
+    {KEY_E4,   2000,  SOL_WREF},
     {KEY_F4,   3000,  SOL_WREF},
-    {KEY_E4,   3600,  SOL_WREF},
-    {KEY_D4,   4200,  SOL_WREF},
-    // Bar 3: C C D E
-    {KEY_C4,   4800,  SOL_WREF},
-    {KEY_C4,   5400,  SOL_WREF},
-    {KEY_D4,   6000,  SOL_WREF},
-    {KEY_E4,   6600,  SOL_WREF},
-    // Bar 4: E. D D-
-    {KEY_E4,   7200,  SOL_WREF},
-    {KEY_D4,   8100,  SOL_WREF},
-    {KEY_D4,   8400,  SOL_WREF},
-    // Bar 5: E E F G
-    {KEY_E4,   9600,  SOL_WREF},
-    {KEY_E4,   10200, SOL_WREF},
-    {KEY_F4,   10800, SOL_WREF},
-    {KEY_G4,   11400, SOL_WREF},
-    // Bar 6: G F E D
-    {KEY_G4,   12000, SOL_WREF},
-    {KEY_F4,   12600, SOL_WREF},
-    {KEY_E4,   13200, SOL_WREF},
-    {KEY_D4,   13800, SOL_WREF},
-    // Bar 7: C C D E
-    {KEY_C4,   14400, SOL_WREF},
-    {KEY_C4,   15000, SOL_WREF},
-    {KEY_D4,   15600, SOL_WREF},
-    {KEY_E4,   16200, SOL_WREF},
-    // Bar 8: D. C C-
-    {KEY_D4,   16800, SOL_WREF},
-    {KEY_C4,   17700, SOL_WREF},
-    {KEY_C4,   18000, SOL_WREF},
+    {KEY_G4,   4000,  SOL_WREF},
+    {KEY_F4,   5000,  SOL_WREF},
+    {KEY_E4,   6000,  SOL_WREF},
+    {KEY_D4,   7000,  SOL_WREF},
+    {KEY_C4,   8000,  SOL_WREF},
 };
 
 // ============ THOMAS THE TANK ENGINE THEME SONG ===============
