@@ -30,20 +30,21 @@
 #define HOME_TO_C4 6655.0f
 
 // Piano key positions in mm from C4 (home)
+// White keys: 21.5mm spacing (RockJam RJ-654)
 #define KEY_C4   0.0f
-#define KEY_CS4  14.0f
 #define KEY_D4   21.5f
-#define KEY_DS4  37.5f
 #define KEY_E4   43.0f
 #define KEY_F4   64.5f
-#define KEY_FS4  84.0f
 #define KEY_G4   86.0f
-#define KEY_GS4  107.5f
 #define KEY_A4   107.5f
-#define KEY_AS4  131.0f
 #define KEY_B4   129.0f
 #define KEY_C5   150.5f
-#define KEY_C6	 280.0f
+// Black keys: centered between adjacent white keys
+#define KEY_CS4  10.75f
+#define KEY_DS4  32.25f
+#define KEY_FS4  75.25f
+#define KEY_GS4  96.75f
+#define KEY_AS4  118.25f
 
 // Solenoid offsets from W_ref in mm
 #define OFFSET_W1    -45.0f
@@ -82,21 +83,47 @@ uint32_t song_start_time = 0;
 NoteMapping currentNote;
 
 // ============ SONG DATA ============
-// list of piano keys and when to play ms from song start
+// Ode to Joy - Beethoven (100 BPM, quarter note = 600ms)
+// All white keys C4-G4, using WREF solenoid
 static SongEntry song[] = {
-	//{KEY_E4,  1500},        // placeholder — replace with your song
-	//{KEY_G4,  4000},     // placeholder
-    {KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
-    {KEY_D4,   1500,  SOL_WREF},   // Step 2:  E4  at P0
-    {KEY_G4,   2500,  SOL_WREF},   // Step 3:  G4  at P1
-    {KEY_AS4,  3500,  SOL_B2},     // Step 4:  Bb4 at P2
-    {KEY_C5,   4500,  SOL_W2},     // Step 5:  C5  at P2
-    {KEY_AS4,  5500,  SOL_B2},     // Step 6:  Bb4 at P2
-    {KEY_G4,   6500,  SOL_WREF},   // Step 7:  G4  at P1
-    {KEY_FS4,  7500,  SOL_B1},     // Step 8:  F#4 at P1
-    {KEY_E4,   8500,  SOL_WREF},   // Step 9:  E4  at P0
-    {KEY_DS4,  9500,  SOL_B1},     // Step 10: D#4 at P0
-    {KEY_C4,   10500, SOL_W1},     // Step 11: C4  at P0
+    // Bar 1: E E F G
+    {KEY_E4,   0,     SOL_WREF},
+    {KEY_E4,   600,   SOL_WREF},
+    {KEY_F4,   1200,  SOL_WREF},
+    {KEY_G4,   1800,  SOL_WREF},
+    // Bar 2: G F E D
+    {KEY_G4,   2400,  SOL_WREF},
+    {KEY_F4,   3000,  SOL_WREF},
+    {KEY_E4,   3600,  SOL_WREF},
+    {KEY_D4,   4200,  SOL_WREF},
+    // Bar 3: C C D E
+    {KEY_C4,   4800,  SOL_WREF},
+    {KEY_C4,   5400,  SOL_WREF},
+    {KEY_D4,   6000,  SOL_WREF},
+    {KEY_E4,   6600,  SOL_WREF},
+    // Bar 4: E. D D-
+    {KEY_E4,   7200,  SOL_WREF},
+    {KEY_D4,   8100,  SOL_WREF},
+    {KEY_D4,   8400,  SOL_WREF},
+    // Bar 5: E E F G
+    {KEY_E4,   9600,  SOL_WREF},
+    {KEY_E4,   10200, SOL_WREF},
+    {KEY_F4,   10800, SOL_WREF},
+    {KEY_G4,   11400, SOL_WREF},
+    // Bar 6: G F E D
+    {KEY_G4,   12000, SOL_WREF},
+    {KEY_F4,   12600, SOL_WREF},
+    {KEY_E4,   13200, SOL_WREF},
+    {KEY_D4,   13800, SOL_WREF},
+    // Bar 7: C C D E
+    {KEY_C4,   14400, SOL_WREF},
+    {KEY_C4,   15000, SOL_WREF},
+    {KEY_D4,   15600, SOL_WREF},
+    {KEY_E4,   16200, SOL_WREF},
+    // Bar 8: D. C C-
+    {KEY_D4,   16800, SOL_WREF},
+    {KEY_C4,   17700, SOL_WREF},
+    {KEY_C4,   18000, SOL_WREF},
 };
 
 // ============ THOMAS THE TANK ENGINE THEME SONG ===============
@@ -308,7 +335,14 @@ void FSM(void) {
                 int32_t nextTarget = (int32_t)((nextWref * MM_TO_COUNTS)+HOME_TO_C4);
 
                 if (nextTarget == target_FSM) {
-                    state = PLAY;
+                    // Same position - fire directly, no movement needed
+                    FireSolenoid(song[song_index].solenoid);
+                    song_index++;
+                    if (song_index >= numNotes) {
+                        state = DONE;
+                    } else {
+                        state = PLAY;
+                    }
                 }
                 else {
                 	state = MOVE;
