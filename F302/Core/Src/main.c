@@ -50,7 +50,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-float Kp_displacement = 4.5f;
+//float Kp_displacement = 4.5f;
+float Kp_displacement = 20.0f;
 float Ki_displacement = 1.2f;
 float Kd_displacement = 0.3f;
 float Kp_velocity = 0.6f;
@@ -61,8 +62,8 @@ const float dt_outer = 0.001f;    // 1kHz
 float countsToRad = (2.0f * M_PI) / 2797.0f;
 
 float vel = 0.0f;
-float maxVel = 10000.0f;
-float maxAccel = 15000.0f;
+float maxVel = 40000.0f;
+float maxAccel = 75000.0f;
 float alpha = 0.05;
 
 volatile int16_t pos = 0;
@@ -87,7 +88,6 @@ volatile float angularDisplacement = 0.0f;
 volatile float angularVelocity = 0.0f;
 volatile float rawVelocity = 0.0f;
 
-int32_t target = 2000;
 int32_t subTarget = 0;
 float subTarget_f = 0.0f;
 //float position_snap_tolerance = 3.0f;
@@ -101,7 +101,7 @@ bool homed = false;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void RateLimiter(uint16_t finalTarget);
+void RateLimiter(int32_t finalTarget);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void MotorSetSpeedPercentCh1(float percent);
 void MotorSetSpeedPercentCh2(float percent);
@@ -171,20 +171,22 @@ int main(void)
 
 	  if (now - lastPrint >= 100) { // every 100 ms
 	  	  lastPrint = HAL_GetTick();
-		  __disable_irq();
-		  int16_t pos_copy = pos;
-		  int32_t sub_copy = subTarget;
-		  float prop_copy = prop_displacement;
-		  float int_copy = integral_displacement;
-		  float deriv_copy = deriv_displacement;
-		  float vel_copy = angularVelocity;
-		  float out_copy = output;
-		  __enable_irq();
+	  	  if (homed) {
+			  __disable_irq();
+			  int16_t pos_copy = pos;
+			  int32_t sub_copy = subTarget;
+			  float prop_copy = prop_displacement;
+			  float int_copy = integral_displacement;
+			  float deriv_copy = deriv_displacement;
+			  float vel_copy = angularVelocity;
+			  float out_copy = output;
+			  __enable_irq();
 
-		  printf("%ld,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
-			  (double)prop_copy, (double)int_copy, (double)deriv_copy,
-			  (double)vel_copy, (double)out_copy);
-		  /*
+			  printf("%ld,%d,%ld,%f,%f,%f,%f,%f\r\n", now, pos_copy, sub_copy,
+				  (double)prop_copy, (double)int_copy, (double)deriv_copy,
+				  (double)vel_copy, (double)out_copy);
+	  	  }
+	  	  /*
 		  switch (state) {
 		      case HOME:
 		          printf("FSM State: HOME\n");
@@ -215,6 +217,11 @@ int main(void)
 			  printf("Time: %ld, Done moving! Start playing.\r\n", now);
 		  }
 		  */
+	  	  /*
+	  	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
+	  		  printf("Test\r\n");
+	  	  }
+	  	  */
 
 		  //if (now < 15000) {
 		  //}
@@ -251,7 +258,9 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -261,12 +270,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -283,7 +292,7 @@ void SystemClock_Config(void)
 void Home(void) {
 	if (homed == false) {
 		MotorSetSpeedPercentCh1(0);
-		MotorSetSpeedPercentCh2(0.1);
+		MotorSetSpeedPercentCh2(0.05);
 		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_SET) {
 			MotorSetSpeedPercentCh1(0);
 			MotorSetSpeedPercentCh2(0);
@@ -292,7 +301,7 @@ void Home(void) {
 	}
 }
 
-void RateLimiter(uint16_t finalTarget) {
+void RateLimiter(int32_t finalTarget) {
 	// TODO: Add rate limiter for target position --> increment target based on slew rate
 
 	float remaining = (float)finalTarget - subTarget_f;
