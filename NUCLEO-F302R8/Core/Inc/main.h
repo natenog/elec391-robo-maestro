@@ -53,6 +53,7 @@ extern bool homed;
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+
 /* USER CODE BEGIN EFP */
 void Home(void);
 /* USER CODE END EFP */

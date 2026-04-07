@@ -1,8 +1,8 @@
 /**
   ******************************************************************************
-  * @file           : fsm_check.c
+  * @file           : fsm.c
   * @brief          : Finite state machine for movement and solenoid pressing logic
-  * @author			: Yousef Mohamed
+  * @author         : Yousef Mohamed
   ******************************************************************************
   */
 
@@ -24,8 +24,6 @@
 #define SOL_B2   5
 
 // ============ PHYSICAL MAPPING ============
-// Calibrate this to your pulley: counts_per_rev / (diameter_mm * PI)
-//#define MM_TO_COUNTS (2797.0f / (2.0f * 11.75f * M_PI))
 #define MM_TO_COUNTS 33.65f
 #define HOME_TO_C4 6655.0f
 
@@ -54,10 +52,13 @@
 
 #define SOLENOID_PULSE_MS 100
 
+// Homing safety: if homing takes longer than this, give up and retry
+#define HOME_TIMEOUT_MS   15000
+
 // ============ TYPES ============
 typedef struct {
-    int32_t motorTarget;  // where to move W_ref (encoder counts)
-    uint8_t solenoid;     // which solenoid to fire
+    int32_t motorTarget;
+    uint8_t solenoid;
 } NoteMapping;
 
 typedef struct {
@@ -72,7 +73,6 @@ uint8_t song_index = 0;
 uint16_t limit_switch_pressed = 0;
 int32_t target_FSM = 0;
 bool limit_switch = false;
-//bool done_move = false;
 bool reset = false;
 bool enCtrl = false;
 
@@ -82,105 +82,26 @@ uint32_t song_start_time = 0;
 NoteMapping currentNote;
 
 // ============ SONG DATA ============
-// list of piano keys and when to play ms from song start
 static SongEntry song[] = {
-	//{KEY_E4,  1500},        // placeholder — replace with your song
-	//{KEY_G4,  4000},     // placeholder
-    //{KEY_C4,   0,     SOL_W1},     // Step 1:  C4  at P0
-    {KEY_D4,   1500,  SOL_WREF},   // Step 2:  E4  at P0
-    {KEY_G4,   2500,  SOL_WREF},   // Step 3:  G4  at P1
-    {KEY_AS4,  3500,  SOL_B2},     // Step 4:  Bb4 at P2
-    {KEY_C5,   4500,  SOL_W2},     // Step 5:  C5  at P2
-    {KEY_AS4,  5500,  SOL_B2},     // Step 6:  Bb4 at P2
-    {KEY_G4,   6500,  SOL_WREF},   // Step 7:  G4  at P1
-    {KEY_FS4,  7500,  SOL_B1},     // Step 8:  F#4 at P1
-    {KEY_E4,   8500,  SOL_WREF},   // Step 9:  E4  at P0
-    {KEY_DS4,  9500,  SOL_B1},     // Step 10: D#4 at P0
-    {KEY_C4,   10500, SOL_W1},     // Step 11: C4  at P0
+    {KEY_C4,   0,     SOL_W1},
+    {KEY_D4,   1500,  SOL_WREF},
+    {KEY_G4,   2500,  SOL_WREF},
+    {KEY_AS4,  3500,  SOL_B2},
+    {KEY_C5,   4500,  SOL_W2},
+    {KEY_AS4,  5500,  SOL_B2},
+    {KEY_G4,   6500,  SOL_WREF},
+    {KEY_FS4,  7500,  SOL_B1},
+    {KEY_E4,   8500,  SOL_WREF},
+    {KEY_DS4,  9500,  SOL_B1},
+    {KEY_C4,   10500, SOL_W1},
 };
-
-// ============ THOMAS THE TANK ENGINE THEME SONG ===============
-
-/*static SongEntry song[] = {
-	// CHORUS
-	{KEY_G4, 0, SOL_WREF},
-	{KEY_A4, 250, SOL_WREF},
-	{KEY_B4, 500, SOL_WREF},
-	{KEY_C5, 750, SOL_WREF},
-	{KEY_D5, 1250, SOL_WREF},
-	{KEY_E5, 1500, SOL_WREF},
-	{KEY_GS4, 2000, SOL_B1},
-
-	{KEY_A4, 4000, SOL_W2},
-	{KEY_F4, 4250, SOL_WREF},
-	{KEY_A4, 4500, SOL_W2},
-	{KEY_G4, 4750, SOL_WREF},
-
-	{KEY_GS4, 5875, SOL_B1},
-	{KEY_A4, 6000, SOL_WREF},
-	{KEY_F4, 6250, SOL_W1},
-	{KEY_F4, 6500, SOL_W1},
-	{KEY_A4, 6750, SOL_WREF},
-	{KEY_G4, 6875, SOL_WREF},
-
-	{KEY_FS4, 7375, SOL_B1},
-	{KEY_G4, 7500, SOL_WREF},
-	{KEY_FS4, 7625, SOL_B1},
-	{KEY_G4, 7750, SOL_WREF},
-	{KEY_FS4, 7875, SOL_B1},
-	{KEY_G4, 8000, SOL_WREF},
-	{KEY_G4, 8500, SOL_WREF},
-
-	{KEY_FS4, 9375, SOL_B1},
-	{KEY_G4, 9500, SOL_WREF},
-	{KEY_FS4, 9625, SOL_B1},
-	{KEY_G4, 9750, SOL_WREF},
-	{KEY_GS4, 10000, SOL_B2},
-	{KEY_GS4, 10500, SOL_B2},
-
-	{KEY_DS4, 11125, SOL_B1},
-	{KEY_F4, 11500, SOL_WREF},
-	{KEY_FS4, 11750, SOL_B2},
-	{KEY_G4, 12000, SOL_WREF},
-	{KEY_AS4, 12500, SOL_B2},
-	{KEY_F4, 13000, SOL_W1},
-	{KEY_G4, 13500, SOL_W1},
-	{KEY_GS4, 14000, SOL_B1},
-
-	// VERSE
-	{KEY_GS3, 15250, SOL_B2},
-	{KEY_G3, 15500, SOL_WREF},
-	{KEY_FS3, 15750, SOL_B2},
-	{KEY_F3, 16000, SOL_WREF},
-	{KEY_F3, 16250, SOL_WREF},
-	{KEY_AS3, 16500, SOL_B2},
-	{KEY_AS3, 16750, SOL_B2},
-	{KEY_CS4, 17000, SOL_B2},
-	{KEY_CS4, 17125, SOL_B2},
-	{KEY_F4, 17375, SOL_W2},
-
-	{KEY_DS3, 18063, SOL_B1},
-	{KEY_DS3, 18313, SOL_B1},
-	{KEY_GS3, 18438, SOL_B2},
-	{KEY_GS3, 18688, SOL_B2},
-	{KEY_C4, 18938, SOL_WREF},
-	{KEY_
-	}
-};
-*/
 
 uint8_t numNotes = sizeof(song) / sizeof(song[0]);
 
 // ============ FUNCTION PROTOTYPES ============
-//void FSM(void);
 NoteMapping MapNote(float keyPosition_mm);
-//void FireSolenoid(uint8_t solenoid);
-//void SolenoidUpdate(void);
-//void StopAllSolenoids(void);
 
 // ============ NOTE MAPPING ============
-// Given a key position in mm, finds the best solenoid and motor position
-// Picks the solenoid that requires the least carriage movement
 NoteMapping MapNote(float keyPosition_mm) {
     NoteMapping result;
 
@@ -192,13 +113,11 @@ NoteMapping MapNote(float keyPosition_mm) {
 
     for (int i = 0; i < 5; i++) {
         float wrefPos = keyPosition_mm - offsets[i];
-
         float dist = fabsf(wrefPos * MM_TO_COUNTS - (float)target_FSM);
         if (dist < bestDist) {
             bestDist = dist;
             best = i;
         }
-
     }
 
     float wrefPos = keyPosition_mm - offsets[best];
@@ -230,7 +149,6 @@ void FireSolenoid(uint8_t solenoid) {
     solenoidOffTime = HAL_GetTick() + SOLENOID_PULSE_MS;
 }
 
-// Call this every loop iteration to turn off solenoid after pulse duration
 void SolenoidUpdate(void) {
     if (solenoidActive && HAL_GetTick() >= solenoidOffTime) {
         StopAllSolenoids();
@@ -248,28 +166,44 @@ void StopAllSolenoids(void) {
 
 // ============ FINITE STATE MACHINE ============
 void FSM(void) {
+    static uint32_t home_state_entry = 0;
+
     uint32_t now = HAL_GetTick();
-    SolenoidUpdate(); // always check if solenoid needs turning off
+    SolenoidUpdate();
 
     switch (state) {
     case HOME:
-        // Wait for limit switch to be pressed to start homing
+        // Track time spent in HOME for the timeout safety
+        if (home_state_entry == 0) {
+            home_state_entry = now;
+        }
+
         StopAllSolenoids();
         Home();
+
         if (homed) {
             limit_switch_pressed = now;
+            home_state_entry = 0;
             state = WAIT;
+        }
+        else if (now - home_state_entry > HOME_TIMEOUT_MS) {
+            // Homing has been running too long. Stop the motor and retry.
+            // Without UART we can't print the failure, but at least we
+            // won't run the motor against a wall forever.
+            MotorSetSpeedPercentCh1(0);
+            MotorSetSpeedPercentCh2(0);
+            home_state_entry = 0;
+            // Stay in HOME — Home() will be called again next FSM tick
         }
         break;
 
     case WAIT:
-        // After the limit switch is pressed, wait 2 seconds before starting the song
-    	__HAL_TIM_SET_COUNTER(&HTIM_ENCODER, 0);
+        // Encoder is already zeroed in Home() now, so we don't need to do it here
         if (now - limit_switch_pressed >= 2000) {
             song_index = 0;
             song_start_time = now;
-            //enCtrl = true;
-            //state = MOVE;
+            enCtrl = true;
+            state = MOVE;
         }
         break;
 
@@ -278,7 +212,7 @@ void FSM(void) {
         float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
         float keyPos = song[song_index].key_mm;
         float wrefPos = keyPos - offsets[song[song_index].solenoid];
-        target_FSM = (int32_t)((wrefPos * MM_TO_COUNTS)+HOME_TO_C4);
+        target_FSM = (int32_t)((wrefPos * MM_TO_COUNTS) + HOME_TO_C4);
 
         if (done_move) {
             done_move = false;
@@ -294,31 +228,25 @@ void FSM(void) {
             break;
         }
         if (now - song_start_time >= song[song_index].time_ms) {
-            //FireSolenoid(song[song_index].solenoid);
-        	//FireSolenoid(SOL_W1);
-        	//song_index++;
-
             if (song_index >= numNotes) {
                 state = DONE;
             }
             else {
-                // Same position if next note's motor target matches current
                 float offsets[6] = {0, OFFSET_W1, OFFSET_WREF, OFFSET_W2, OFFSET_B1, OFFSET_B2};
                 float nextWref = song[song_index].key_mm - offsets[song[song_index].solenoid];
-                int32_t nextTarget = (int32_t)((nextWref * MM_TO_COUNTS)+HOME_TO_C4);
+                int32_t nextTarget = (int32_t)((nextWref * MM_TO_COUNTS) + HOME_TO_C4);
 
                 if (nextTarget == target_FSM) {
                     state = PLAY;
                 }
                 else {
-                	state = MOVE;
+                    state = MOVE;
                 }
             }
         }
         break;
 
     case DONE:
-        // Song finished, wait for reset
         if (reset) state = HOME;
         break;
 

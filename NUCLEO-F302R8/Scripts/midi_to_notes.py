@@ -86,6 +86,6 @@ if __name__ == '__main__':
     #     sys.exit(1)
     # midi_to_timeline(sys.argv[1], sys.argv[2] if len(sys.argv)>2 else 'timeline.json')
     #midi_path = r"D:\STM32CubeIDE\workspace_2.0.0\elec391-robo-maestro\ETE7-Thomas_the_Tank_Engine_theme.mid"
-    midi_path = r"C:\Users\nnog2\Desktop\ELEC Year 4\ELEC391\Thomas The Tank Engine Theme Song.mid"
+    midi_path = r"C:\Users\nnog2\Desktop\ELEC Year 4\ELEC391\House of the Rising Sun.mid"
     out_json = os.path.join(os.path.abspath(__file__), '..', 'timeline.json')
     midi_to_timeline(midi_path, out_json)
